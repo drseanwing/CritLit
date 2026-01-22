@@ -366,10 +366,10 @@ These features will be added in subsequent beta and production releases.
 ## Notes on Task Organization
 
 This task list is organized to:
-1. Build foundational infrastructure first
-2. Add workflows incrementally
-3. Integrate external services one at a time
-4. Test each major component before moving forward
-5. Document as capabilities are proven
+- Build foundational infrastructure first
+- Add workflows incrementally
+- Integrate external services one at a time
+- Test each major component before moving forward
+- Document as capabilities are proven
 
 Each task is atomic, testable, and moves the project toward a demonstrable alpha release.
