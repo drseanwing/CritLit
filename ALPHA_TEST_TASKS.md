@@ -69,7 +69,7 @@ This document outlines the tasks required to go from the current state (specific
 
 24. Create verification script that confirms PostgreSQL accepts connections.
 
-25. Create verification script that confirms pgvector extension is operational.
+25. Create verification script that confirms vector extension is operational.
 
 26. Create verification script that confirms n8n web interface is accessible.
 
