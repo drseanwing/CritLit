@@ -83,25 +83,25 @@ This document outlines the tasks required to go from the current state (specific
 
 ### Workflow Infrastructure Tasks
 
-29. Create main coordinator workflow file structure.
+29. ✓ Create main coordinator workflow file structure.
 
-30. Configure webhook trigger node for coordinator workflow entry point.
+30. ✓ Configure webhook trigger node for coordinator workflow entry point.
 
-31. Configure PostgreSQL node to load review state from database.
+31. ✓ Configure PostgreSQL node to load review state from database.
 
-32. Configure coordinator AI agent node with task routing instructions.
+32. ✓ Configure coordinator AI agent node with task routing instructions.
 
-33. Configure stage router switch node for workflow delegation.
+33. ✓ Configure stage router switch node for workflow delegation.
 
-34. Configure checkpoint save node to persist workflow state.
+34. ✓ Configure checkpoint save node to persist workflow state.
 
-35. Create protocol setup workflow file structure.
+35. ✓ Create protocol setup workflow file structure.
 
-36. Create search execution workflow file structure.
+36. ✓ Create search execution workflow file structure.
 
-37. Create screening batch workflow file structure.
+37. ✓ Create screening batch workflow file structure.
 
-38. Export workflow JSON files to workflows directory for version control.
+38. ✓ Export workflow JSON files to workflows directory for version control.
 
 ---
 
