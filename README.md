@@ -241,11 +241,24 @@ ORDER BY updated_at DESC LIMIT 1;
 - [x] Search execution logging and PRISMA tracking
 - [x] Test workflow for PubMed integration validation
 
-### 🚧 In Progress (Phase 4-10)
+**Phase 4: Screening Agent Implementation (tasks 49-62)**
+- [x] Screening prompt template with PICO framework placeholders
+- [x] Ollama chat model integration with Llama 3.1 support
+- [x] PostgreSQL query for fetching unscreened documents in batches
+- [x] Split in batches node for configurable batch size
+- [x] AI screening agent with structured JSON output
+- [x] JSON parsing for screening decisions
+- [x] Confidence score calculation for decision routing
+- [x] PostgreSQL insert for screening decisions with full rationale
+- [x] Conditional routing for low-confidence decisions to human review
+- [x] Rate limiting between LLM calls
+- [x] Error handling for Ollama failures
+- [x] Screening stage router in coordinator workflow
+
+### 🚧 In Progress (Phase 5-10)
 
 See [ALPHA_TEST_TASKS.md](ALPHA_TEST_TASKS.md) for complete task list:
 
-- Phase 4: Screening Agent Implementation (tasks 49-62)
 - Phase 5: Checkpoint and Resume (tasks 63-71)
 - Phase 6: PRISMA Flow Tracking (tasks 72-78)
 - Phase 7: Basic Human Review Interface (tasks 79-85)
@@ -277,6 +290,6 @@ Built following the "Ralph Playbook" pattern for multi-agent orchestration with 
 
 ---
 
-**Version**: Alpha 0.3  
+**Version**: Alpha 0.4  
 **Last Updated**: 2026-01-24  
-**Status**: Phase 1, 2 & 3 Complete, Phase 4 In Progress
+**Status**: Phase 1-4 Complete, Phase 5 In Progress

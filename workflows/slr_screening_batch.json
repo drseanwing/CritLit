@@ -28,7 +28,13 @@
             {
               "id": "extract-batch-size",
               "name": "batch_size",
-              "value": "={{ $json.body.batch_size || $env.SCREENING_BATCH_SIZE || 50 }}",
+              "value": "={{ $json.body.batch_size || parseInt($env.SCREENING_BATCH_SIZE) || 50 }}",
+              "type": "number"
+            },
+            {
+              "id": "extract-confidence-threshold",
+              "name": "confidence_threshold",
+              "value": "={{ $json.body.confidence_threshold || parseFloat($env.SCREENING_CONFIDENCE_THRESHOLD) || 0.85 }}",
               "type": "number"
             }
           ]
@@ -44,8 +50,10 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT r.id as review_id, r.pico, r.inclusion_criteria, r.exclusion_criteria\nFROM reviews r\nWHERE r.id = $1::uuid\nLIMIT 1;",
-        "options": {}
+        "query": "SELECT r.id as review_id, r.pico, r.inclusion_criteria, r.exclusion_criteria, r.title as review_title\nFROM reviews r\nWHERE r.id = $1::uuid\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id] }}"
+        }
       },
       "id": "load-review-criteria",
       "name": "Load Review Criteria",
@@ -61,15 +69,46 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT d.id, d.title, d.abstract, d.external_id, d.publication_year, d.authors\nFROM documents d\nLEFT JOIN screening_decisions sd ON d.id = sd.document_id\nWHERE d.review_id = $1::uuid\n  AND sd.id IS NULL\n  AND d.screening_status = 'pending'\nORDER BY d.created_at ASC\nLIMIT $2::integer;",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-review-exists",
+              "leftValue": "={{ $json.review_id !== undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
         "options": {}
+      },
+      "id": "check-review-exists",
+      "name": "Check Review Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  d.id as document_id,\n  d.title,\n  d.abstract,\n  d.external_ids,\n  d.publication_year,\n  d.authors,\n  d.journal,\n  d.study_type\nFROM documents d\nLEFT JOIN screening_decisions sd ON d.id = sd.document_id AND sd.screening_stage = 'title_abstract'\nWHERE d.review_id = $1::uuid\n  AND sd.id IS NULL\n  AND d.screening_status = 'pending'\n  AND d.is_duplicate = FALSE\nORDER BY d.created_at ASC\nLIMIT $2::integer;",
+        "options": {
+          "queryReplacement": "={{ [$('Extract Screening Parameters').first().json.review_id, $('Extract Screening Parameters').first().json.batch_size] }}"
+        }
       },
       "id": "fetch-unscreened-documents",
       "name": "Fetch Unscreened Documents",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [850, 300],
+      "position": [1050, 400],
       "credentials": {
         "postgres": {
           "id": "postgres-slr-database",
@@ -79,29 +118,32 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "id": "prepare-fetch-review-id",
-              "name": "review_id",
-              "value": "={{ $('Extract Screening Parameters').item.json.review_id }}",
-              "type": "string"
-            },
-            {
-              "id": "prepare-fetch-batch-size",
-              "name": "batch_size",
-              "value": "={{ $('Extract Screening Parameters').item.json.batch_size }}",
-              "type": "number"
+              "id": "check-has-documents",
+              "leftValue": "={{ $input.all().length > 0 && $input.first().json.document_id !== undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
           ]
         },
         "options": {}
       },
-      "id": "prepare-fetch-params",
-      "name": "Prepare Fetch Parameters",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [750, 300]
+      "id": "check-has-documents",
+      "name": "Check Has Documents",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 400]
     },
     {
       "parameters": {
@@ -112,60 +154,163 @@
       "name": "Split In Batches",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1050, 300]
+      "position": [1450, 500]
     },
     {
       "parameters": {
-        "jsCode": "// Prepare screening prompt for Ollama\nconst document = $input.item.json;\nconst criteria = $('Load Review Criteria').item.json;\n\nconst prompt = `You are a systematic review screener following Cochrane standards.\n\nINCLUSION CRITERIA:\nPopulation: ${criteria.pico.population}\nIntervention: ${criteria.pico.intervention}\nComparator: ${criteria.pico.comparator}\nOutcomes: ${criteria.pico.outcomes.join(', ')}\nStudy Types: ${criteria.pico.study_types.join(', ')}\n\nAdditional Inclusion Criteria:\n${JSON.stringify(criteria.inclusion_criteria, null, 2)}\n\nExclusion Criteria:\n${JSON.stringify(criteria.exclusion_criteria, null, 2)}\n\nDOCUMENT TO SCREEN:\nTitle: ${document.title}\nAbstract: ${document.abstract || 'No abstract available'}\nYear: ${document.publication_year || 'Unknown'}\n\nTASK:\nDetermine if this document meets the inclusion criteria. Respond with:\n1. DECISION: \"include\", \"exclude\", or \"uncertain\"\n2. CONFIDENCE: 0.0 to 1.0\n3. REASONING: 2-3 sentence justification\n4. EXCLUSION_REASON: If exclude, specify which criterion was not met\n\nRespond ONLY with valid JSON in this format:\n{\n  \"decision\": \"include|exclude|uncertain\",\n  \"confidence\": 0.85,\n  \"reasoning\": \"Your reasoning here\",\n  \"exclusion_reason\": \"Reason if excluded, null otherwise\"\n}`;\n\nreturn {\n  json: {\n    document_id: document.id,\n    review_id: criteria.review_id,\n    prompt: prompt,\n    title: document.title,\n    abstract: document.abstract\n  }\n};"
+        "jsCode": "/**\n * Prepare screening prompt for Ollama with PICO framework\n * Task 49: Screening prompt template with PICO framework placeholders\n * Task 53: Screening agent tool definition with input schema\n */\n\nconst document = $input.first().json;\nconst criteria = $('Load Review Criteria').first().json;\nconst params = $('Extract Screening Parameters').first().json;\n\n// Build PICO section\nconst pico = criteria.pico || {};\nconst picoSection = `POPULATION: ${pico.population || 'Not specified'}\nINTERVENTION: ${pico.intervention || 'Not specified'}\nCOMPARATOR: ${pico.comparator || 'Not specified'}\nOUTCOMES: ${Array.isArray(pico.outcomes) ? pico.outcomes.join(', ') : 'Not specified'}\nSTUDY TYPES: ${Array.isArray(pico.study_types) ? pico.study_types.join(', ') : 'RCT, cohort, case-control'}`;\n\n// Build inclusion/exclusion criteria\nconst inclusionCriteria = criteria.inclusion_criteria || {};\nconst exclusionCriteria = criteria.exclusion_criteria || {};\n\nlet additionalInclusion = '';\nif (inclusionCriteria.language) {\n  additionalInclusion += `- Language: ${Array.isArray(inclusionCriteria.language) ? inclusionCriteria.language.join(', ') : inclusionCriteria.language}\\n`;\n}\nif (inclusionCriteria.min_year) {\n  additionalInclusion += `- Publication year: ${inclusionCriteria.min_year} or later\\n`;\n}\n\nlet additionalExclusion = '';\nif (exclusionCriteria.study_types) {\n  additionalExclusion += `- Excluded study types: ${Array.isArray(exclusionCriteria.study_types) ? exclusionCriteria.study_types.join(', ') : exclusionCriteria.study_types}\\n`;\n}\n\n// Build document section\nconst authors = document.authors || [];\nconst authorStr = Array.isArray(authors) \n  ? authors.slice(0, 3).map(a => a.name || a).join(', ') + (authors.length > 3 ? ' et al.' : '')\n  : 'Unknown';\n\nconst abstractText = document.abstract || 'No abstract available';\n\n// Task 54: AI agent node with screening system prompt for structured output\nconst systemPrompt = `You are an expert systematic review screener following Cochrane methodological standards.\nYour task is to determine if a research article meets the inclusion criteria for a systematic review.\n\nYou must evaluate the title and abstract against the PICO criteria and provide a structured decision.\n\nIMPORTANT GUIDELINES:\n1. Be INCLUSIVE when uncertain - systematic reviews should not miss relevant studies\n2. If the abstract lacks information about key criteria, mark as \"uncertain\" for human review\n3. Base decisions ONLY on information in the title and abstract\n4. Consider study design, population, intervention, and outcomes\n5. Provide clear, specific reasoning for your decision\n\nRESPONSE FORMAT:\nYou must respond with ONLY a valid JSON object (no markdown, no explanation outside JSON):\n{\n  \"decision\": \"include\" | \"exclude\" | \"uncertain\",\n  \"confidence\": 0.0 to 1.0,\n  \"reasoning\": \"2-3 sentences explaining your decision\",\n  \"exclusion_reason\": \"category if excluded, null otherwise\",\n  \"criteria_matched\": {\n    \"population\": true/false,\n    \"intervention\": true/false,\n    \"outcomes\": true/false,\n    \"study_type\": true/false\n  }\n}\n\nEXCLUSION REASON CATEGORIES:\n- \"wrong_population\" - Does not match target population\n- \"wrong_intervention\" - Does not study the intervention of interest\n- \"wrong_outcome\" - Does not report relevant outcomes\n- \"wrong_study_type\" - Not an included study design (e.g., case report, editorial)\n- \"wrong_language\" - Not in required language\n- \"duplicate\" - Duplicate publication\n- \"protocol_only\" - Study protocol without results`;\n\nconst userPrompt = `SYSTEMATIC REVIEW: ${criteria.review_title || 'Untitled Review'}\n\n=== INCLUSION CRITERIA ===\n\nPICO FRAMEWORK:\n${picoSection}\n\n${additionalInclusion ? 'ADDITIONAL INCLUSION CRITERIA:\\n' + additionalInclusion : ''}\n${additionalExclusion ? 'EXCLUSION CRITERIA:\\n' + additionalExclusion : ''}\n\n=== DOCUMENT TO SCREEN ===\n\nTITLE: ${document.title}\nAUTHORS: ${authorStr}\nJOURNAL: ${document.journal || 'Unknown'}\nYEAR: ${document.publication_year || 'Unknown'}\n${document.study_type ? 'STUDY TYPE: ' + document.study_type : ''}\n\nABSTRACT:\n${abstractText}\n\n=== YOUR TASK ===\n\nEvaluate this document against the inclusion criteria and provide your structured decision as JSON.`;\n\nconst startTime = Date.now();\n\nreturn [{\n  json: {\n    document_id: document.document_id,\n    review_id: criteria.review_id,\n    title: document.title,\n    confidence_threshold: params.confidence_threshold,\n    system_prompt: systemPrompt,\n    user_prompt: userPrompt,\n    start_time: startTime\n  }\n}];"
       },
       "id": "prepare-screening-prompt",
       "name": "Prepare Screening Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [1650, 500]
     },
     {
       "parameters": {
-        "model": "={{ $env.OLLAMA_SCREENING_MODEL || 'llama3.1:8b' }}",
-        "prompt": "={{ $json.prompt }}",
+        "url": "={{ $env.OLLAMA_BASE_URL || 'http://ollama:11434' }}/api/chat",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.OLLAMA_SCREENING_MODEL || 'llama3.1:8b', messages: [{ role: 'system', content: $json.system_prompt }, { role: 'user', content: $json.user_prompt }], stream: false, options: { temperature: 0.1, top_p: 0.9, num_predict: 500 }, format: 'json' }) }}",
         "options": {
-          "temperature": 0.1,
-          "topP": 0.9
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         }
       },
       "id": "ollama-screening-agent",
       "name": "Ollama Screening Agent",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
-      "typeVersion": 1,
-      "position": [1450, 300],
-      "credentials": {
-        "ollamaApi": {
-          "id": "ollama-api-credentials",
-          "name": "Ollama API"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 500],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Parse screening decision from LLM response\nconst response = $input.item.json;\nconst documentData = $('Prepare Screening Prompt').item.json;\n\nlet decision;\ntry {\n  // Try to parse JSON response from LLM\n  const text = response.response || response.text || response.message || JSON.stringify(response);\n  \n  // Extract JSON from response (might be wrapped in markdown code blocks)\n  const jsonMatch = text.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    decision = JSON.parse(jsonMatch[0]);\n  } else {\n    // Fallback: treat as uncertain if parsing fails\n    decision = {\n      decision: 'uncertain',\n      confidence: 0.5,\n      reasoning: 'Failed to parse LLM response',\n      exclusion_reason: null\n    };\n  }\n} catch (error) {\n  decision = {\n    decision: 'uncertain',\n    confidence: 0.5,\n    reasoning: `Error parsing response: ${error.message}`,\n    exclusion_reason: null\n  };\n}\n\nreturn {\n  json: {\n    document_id: documentData.document_id,\n    review_id: documentData.review_id,\n    decision: decision.decision,\n    confidence: decision.confidence,\n    reasoning: decision.reasoning,\n    exclusion_reason: decision.exclusion_reason,\n    screened_at: new Date().toISOString()\n  }\n};"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-ollama-error",
+              "leftValue": "={{ $json.error !== undefined || $json.message?.content === undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-ollama-error",
+      "name": "Check Ollama Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2050, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Handle Ollama error - mark document for human review\n */\n\nconst promptData = $('Prepare Screening Prompt').first().json;\nconst errorData = $input.first().json;\n\nreturn [{\n  json: {\n    document_id: promptData.document_id,\n    review_id: promptData.review_id,\n    decision: 'uncertain',\n    confidence: 0.0,\n    reasoning: `LLM error: ${errorData.error || 'Unknown error occurred'}. Document flagged for human review.`,\n    exclusion_reason: null,\n    criteria_matched: null,\n    processing_time_ms: Date.now() - promptData.start_time,\n    needs_human_review: true,\n    error_occurred: true\n  }\n}];"
+      },
+      "id": "handle-ollama-error",
+      "name": "Handle Ollama Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Task 55: Parse screening agent JSON output into decision objects\n * Task 56: Calculate confidence scores for decision routing\n */\n\nconst response = $input.first().json;\nconst promptData = $('Prepare Screening Prompt').first().json;\n\nlet decision;\ntry {\n  // Extract the message content from Ollama response\n  const content = response.message?.content || response.response || '';\n  \n  // Try to parse JSON from the response\n  let jsonStr = content;\n  \n  // Handle potential markdown code blocks\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (jsonMatch) {\n    jsonStr = jsonMatch[1].trim();\n  }\n  \n  // Extract JSON object\n  const objectMatch = jsonStr.match(/\\{[\\s\\S]*\\}/);\n  if (objectMatch) {\n    decision = JSON.parse(objectMatch[0]);\n  } else {\n    throw new Error('No JSON object found in response');\n  }\n  \n  // Validate required fields\n  if (!decision.decision || !['include', 'exclude', 'uncertain'].includes(decision.decision)) {\n    decision.decision = 'uncertain';\n  }\n  \n  // Ensure confidence is valid\n  if (typeof decision.confidence !== 'number' || decision.confidence < 0 || decision.confidence > 1) {\n    decision.confidence = 0.5;\n  }\n  \n  // Ensure reasoning exists\n  if (!decision.reasoning) {\n    decision.reasoning = 'No reasoning provided by model';\n  }\n  \n} catch (error) {\n  // Fallback decision on parse error\n  decision = {\n    decision: 'uncertain',\n    confidence: 0.3,\n    reasoning: `Failed to parse LLM response: ${error.message}. Raw response: ${(response.message?.content || '').substring(0, 200)}`,\n    exclusion_reason: null,\n    criteria_matched: null\n  };\n}\n\n// Task 56: Calculate if human review is needed based on confidence threshold\nconst confidenceThreshold = promptData.confidence_threshold || 0.85;\nconst needsHumanReview = decision.confidence < confidenceThreshold || decision.decision === 'uncertain';\n\nconst processingTimeMs = Date.now() - promptData.start_time;\n\nreturn [{\n  json: {\n    document_id: promptData.document_id,\n    review_id: promptData.review_id,\n    title: promptData.title,\n    decision: decision.decision,\n    confidence: decision.confidence,\n    reasoning: decision.reasoning,\n    exclusion_reason: decision.exclusion_reason || null,\n    criteria_matched: decision.criteria_matched || null,\n    processing_time_ms: processingTimeMs,\n    needs_human_review: needsHumanReview,\n    confidence_threshold: confidenceThreshold,\n    error_occurred: false\n  }\n}];"
       },
       "id": "parse-screening-decision",
       "name": "Parse Screening Decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1650, 300]
+      "position": [2250, 600]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "merge-decisions",
+      "name": "Merge Decisions",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2450, 500]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO screening_decisions (review_id, document_id, decision, confidence, reasoning, exclusion_reason, screened_at, screener_type, screener_id)\nVALUES (\n  $1::uuid,\n  $2::uuid,\n  $3::text,\n  $4::numeric,\n  $5::text,\n  $6::text,\n  $7::timestamptz,\n  'ai',\n  'ollama-llama3.1'\n)\nRETURNING *;",
-        "options": {}
+        "query": "INSERT INTO screening_decisions (\n  document_id,\n  review_id,\n  screening_stage,\n  reviewer_type,\n  reviewer_id,\n  decision,\n  confidence,\n  exclusion_reason,\n  rationale,\n  criteria_matched,\n  processing_time_ms,\n  created_at\n)\nVALUES (\n  $1::uuid,\n  $2::uuid,\n  'title_abstract',\n  'ai_primary',\n  $3::varchar,\n  $4::varchar,\n  $5::numeric,\n  $6::varchar,\n  $7::text,\n  $8::jsonb,\n  $9::integer,\n  NOW()\n)\nRETURNING id, document_id, decision, confidence;",
+        "options": {
+          "queryReplacement": "={{ [$json.document_id, $json.review_id, ($env.OLLAMA_SCREENING_MODEL || 'llama3.1:8b'), $json.decision, $json.confidence, $json.exclusion_reason, $json.reasoning, $json.criteria_matched ? JSON.stringify($json.criteria_matched) : null, $json.processing_time_ms] }}"
+        }
       },
       "id": "save-screening-decision",
       "name": "Save Screening Decision",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [1850, 300],
+      "position": [2650, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-needs-human-review",
+              "leftValue": "={{ $('Merge Decisions').first().json.needs_human_review }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "route-by-confidence",
+      "name": "Route By Confidence",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2850, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE documents\nSET \n  screening_status = 'needs_review',\n  updated_at = NOW()\nWHERE id = $1::uuid\nRETURNING id, title, screening_status;",
+        "options": {
+          "queryReplacement": "={{ [$('Merge Decisions').first().json.document_id] }}"
+        }
+      },
+      "id": "update-needs-review",
+      "name": "Update Needs Review",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [3050, 400],
       "credentials": {
         "postgres": {
           "id": "postgres-slr-database",
@@ -176,14 +321,16 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE documents\nSET screening_status = CASE\n  WHEN $2::text = 'include' THEN 'included'\n  WHEN $2::text = 'exclude' THEN 'excluded'\n  ELSE 'needs_review'\nEND,\nupdated_at = NOW()\nWHERE id = $1::uuid\nRETURNING *;",
-        "options": {}
+        "query": "UPDATE documents\nSET \n  screening_status = CASE\n    WHEN $2::text = 'include' THEN 'included'\n    WHEN $2::text = 'exclude' THEN 'excluded'\n    ELSE 'needs_review'\n  END,\n  updated_at = NOW()\nWHERE id = $1::uuid\nRETURNING id, title, screening_status;",
+        "options": {
+          "queryReplacement": "={{ [$('Merge Decisions').first().json.document_id, $('Merge Decisions').first().json.decision] }}"
+        }
       },
       "id": "update-document-status",
       "name": "Update Document Status",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [2050, 300],
+      "position": [3050, 600],
       "credentials": {
         "postgres": {
           "id": "postgres-slr-database",
@@ -193,61 +340,54 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "prepare-update-doc-id",
-              "name": "document_id",
-              "value": "={{ $('Parse Screening Decision').item.json.document_id }}",
-              "type": "string"
-            },
-            {
-              "id": "prepare-update-decision",
-              "name": "decision",
-              "value": "={{ $('Parse Screening Decision').item.json.decision }}",
-              "type": "string"
-            }
-          ]
-        },
         "options": {}
       },
-      "id": "prepare-update-params",
-      "name": "Prepare Update Parameters",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [1950, 300]
+      "id": "merge-status-updates",
+      "name": "Merge Status Updates",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3250, 500]
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "aggregate-review-id",
-              "name": "review_id",
-              "value": "={{ $('Extract Screening Parameters').item.json.review_id }}",
-              "type": "string"
-            },
-            {
-              "id": "aggregate-processed-count",
-              "name": "documents_processed",
-              "value": "={{ $('Split In Batches').item.json.batchCount }}",
-              "type": "number"
-            },
-            {
-              "id": "aggregate-status",
-              "name": "status",
-              "value": "screening_complete",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO audit_log (review_id, event_type, event_data, created_at)\nVALUES (\n  $1::uuid,\n  'document_screened',\n  $2::jsonb,\n  NOW()\n)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [$('Merge Decisions').first().json.review_id, JSON.stringify({ document_id: $('Merge Decisions').first().json.document_id, decision: $('Merge Decisions').first().json.decision, confidence: $('Merge Decisions').first().json.confidence, needs_human_review: $('Merge Decisions').first().json.needs_human_review })] }}"
+        }
+      },
+      "id": "audit-screening-decision",
+      "name": "Audit Screening Decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [3450, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ $env.PUBMED_API_KEY ? 0.5 : 2 }}",
+        "unit": "seconds"
+      },
+      "id": "rate-limit-wait",
+      "name": "Rate Limit Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3650, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Generate final screening batch results\n */\n\nconst params = $('Extract Screening Parameters').first().json;\nconst allDecisions = $input.all();\n\n// Calculate statistics\nlet included = 0;\nlet excluded = 0;\nlet uncertain = 0;\nlet needsReview = 0;\nlet totalConfidence = 0;\nlet totalProcessingTime = 0;\n\nfor (const item of allDecisions) {\n  const decision = item.json.decision || 'uncertain';\n  if (decision === 'include') included++;\n  else if (decision === 'exclude') excluded++;\n  else uncertain++;\n  \n  if (item.json.needs_human_review) needsReview++;\n  totalConfidence += item.json.confidence || 0;\n  totalProcessingTime += item.json.processing_time_ms || 0;\n}\n\nconst totalDocs = allDecisions.length;\nconst avgConfidence = totalDocs > 0 ? (totalConfidence / totalDocs).toFixed(3) : 0;\nconst avgProcessingTime = totalDocs > 0 ? Math.round(totalProcessingTime / totalDocs) : 0;\n\nreturn [{\n  json: {\n    success: true,\n    review_id: params.review_id,\n    batch_size_requested: params.batch_size,\n    documents_screened: totalDocs,\n    statistics: {\n      included: included,\n      excluded: excluded,\n      uncertain: uncertain,\n      needs_human_review: needsReview,\n      average_confidence: parseFloat(avgConfidence),\n      average_processing_time_ms: avgProcessingTime\n    },\n    confidence_threshold: params.confidence_threshold,\n    message: `Screening complete. ${totalDocs} documents processed. ${needsReview} flagged for human review.`\n  }\n}];"
       },
       "id": "aggregate-results",
       "name": "Aggregate Results",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [2250, 300]
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3850, 400]
     },
     {
       "parameters": {
@@ -258,7 +398,51 @@
       "name": "Respond Screening Complete",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2450, 300]
+      "position": [4050, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Handle no documents to screen\n */\n\nconst params = $('Extract Screening Parameters').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    review_id: params.review_id,\n    documents_screened: 0,\n    message: 'No unscreened documents found for this review. All documents have been processed.',\n    status: 'no_pending_documents'\n  }\n}];"
+      },
+      "id": "handle-no-documents",
+      "name": "Handle No Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-no-documents",
+      "name": "Respond No Documents",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Handle review not found error\n */\n\nconst params = $('Extract Screening Parameters').first().json;\n\nreturn [{\n  json: {\n    success: false,\n    review_id: params.review_id,\n    error: 'Review not found',\n    message: `No review found with ID: ${params.review_id}. Please check the review ID and try again.`\n  }\n}];"
+      },
+      "id": "handle-review-not-found",
+      "name": "Handle Review Not Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "respond-review-not-found",
+      "name": "Respond Review Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 200]
     }
   ],
   "connections": {
@@ -288,18 +472,36 @@
       "main": [
         [
           {
-            "node": "Prepare Fetch Parameters",
+            "node": "Check Review Exists",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Fetch Parameters": {
+    "Check Review Exists": {
       "main": [
         [
           {
             "node": "Fetch Unscreened Documents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Review Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Review Not Found": {
+      "main": [
+        [
+          {
+            "node": "Respond Review Not Found",
             "type": "main",
             "index": 0
           }
@@ -310,7 +512,36 @@
       "main": [
         [
           {
+            "node": "Check Has Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Has Documents": {
+      "main": [
+        [
+          {
             "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle No Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle No Documents": {
+      "main": [
+        [
+          {
+            "node": "Respond No Documents",
             "type": "main",
             "index": 0
           }
@@ -350,6 +581,31 @@
       "main": [
         [
           {
+            "node": "Check Ollama Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Ollama Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ollama Error": {
+      "main": [
+        [
+          {
+            "node": "Handle Ollama Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Parse Screening Decision",
             "type": "main",
             "index": 0
@@ -357,7 +613,29 @@
         ]
       ]
     },
+    "Handle Ollama Error": {
+      "main": [
+        [
+          {
+            "node": "Merge Decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Parse Screening Decision": {
+      "main": [
+        [
+          {
+            "node": "Merge Decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Decisions": {
       "main": [
         [
           {
@@ -372,15 +650,22 @@
       "main": [
         [
           {
-            "node": "Prepare Update Parameters",
+            "node": "Route By Confidence",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Update Parameters": {
+    "Route By Confidence": {
       "main": [
+        [
+          {
+            "node": "Update Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Update Document Status",
@@ -390,7 +675,51 @@
         ]
       ]
     },
+    "Update Needs Review": {
+      "main": [
+        [
+          {
+            "node": "Merge Status Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Update Document Status": {
+      "main": [
+        [
+          {
+            "node": "Merge Status Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Status Updates": {
+      "main": [
+        [
+          {
+            "node": "Audit Screening Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Screening Decision": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Wait": {
       "main": [
         [
           {
@@ -415,11 +744,12 @@
   },
   "pinData": {},
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "errorWorkflow": "slr-error-handler"
   },
   "staticData": null,
-  "tags": [],
+  "tags": ["slr", "screening", "ollama"],
   "triggerCount": 1,
-  "updatedAt": "2026-01-24T14:17:58.607Z",
-  "versionId": "1"
+  "updatedAt": "2026-01-24T15:03:45.397Z",
+  "versionId": "2"
 }

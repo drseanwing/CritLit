@@ -135,33 +135,33 @@ This document outlines the tasks required to go from the current state (specific
 
 ### AI Screening Tasks
 
-49. Create screening prompt template with PICO framework placeholders.
+49. ✓ Create screening prompt template with PICO framework placeholders.
 
-50. Configure Ollama chat model node with Llama 3.1 model specification.
+50. ✓ Configure Ollama chat model node with Llama 3.1 model specification.
 
-51. Create PostgreSQL query node to fetch unscreened documents in batches.
+51. ✓ Create PostgreSQL query node to fetch unscreened documents in batches.
 
-52. Configure split in batches node with appropriate batch size for screening.
+52. ✓ Configure split in batches node with appropriate batch size for screening.
 
-53. Create screening agent tool definition with input schema for PICO criteria.
+53. ✓ Create screening agent tool definition with input schema for PICO criteria.
 
-54. Configure AI agent node with screening system prompt for structured output.
+54. ✓ Configure AI agent node with screening system prompt for structured output.
 
-55. Create code node to parse screening agent JSON output into decision objects.
+55. ✓ Create code node to parse screening agent JSON output into decision objects.
 
-56. Create code node to calculate confidence scores for decision routing.
+56. ✓ Create code node to calculate confidence scores for decision routing.
 
-57. Configure PostgreSQL insert node to save screening decisions with rationale.
+57. ✓ Configure PostgreSQL insert node to save screening decisions with rationale.
 
-58. Create conditional node to route low-confidence decisions for human review.
+58. ✓ Create conditional node to route low-confidence decisions for human review.
 
-59. Configure rate limiting wait node to prevent overwhelming local LLM.
+59. ✓ Configure rate limiting wait node to prevent overwhelming local LLM.
 
-60. Create screening agent that processes a single document into structured decision.
+60. ✓ Create screening agent that processes a single document into structured decision.
 
-61. Create batch screening workflow that processes 100 documents sequentially.
+61. ✓ Create batch screening workflow that processes 100 documents sequentially.
 
-62. Configure screening stage router in coordinator to invoke screening workflow.
+62. ✓ Configure screening stage router in coordinator to invoke screening workflow.
 
 ---
 

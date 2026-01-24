@@ -99,23 +99,35 @@ This directory contains n8n workflow JSON files for the Autonomous Systematic Li
 All parameters are optional - defaults are provided for quick testing.
 
 ### 4. slr_screening_batch.json
-**Purpose**: Perform AI-powered title/abstract screening using Ollama LLM.
+**Purpose**: Perform AI-powered title/abstract screening using Ollama LLM with confidence-based routing.
 
 **Key Features**:
-- Batch fetching of unscreened documents
-- PICO criteria-based prompt generation
-- Ollama integration for local LLM inference
-- Structured decision parsing (include/exclude/uncertain)
-- Confidence scoring for human review routing
-- Document status updates based on screening decisions
+- Batch fetching of unscreened documents from PostgreSQL
+- Comprehensive PICO-based screening prompt template following Cochrane standards
+- Ollama integration with configurable model (llama3.1:8b or llama3.1:70b)
+- Structured JSON output parsing for screening decisions
+- Confidence score calculation for decision routing
+- Conditional routing of low-confidence decisions for human review
+- Rate limiting between LLM calls to prevent overwhelming Ollama
+- Error handling for LLM failures with automatic flagging for human review
+- Document status updates (included, excluded, needs_review)
+- Audit logging for all screening decisions
+- Statistics aggregation (include/exclude/uncertain counts, average confidence)
 
 **Trigger**: POST to `/webhook/slr-screening-batch` with body:
 ```json
 {
   "review_id": "uuid-of-review",
-  "batch_size": 50
+  "batch_size": 50,
+  "confidence_threshold": 0.85
 }
 ```
+
+**Response includes**:
+- Documents screened count
+- Statistics (included, excluded, uncertain, needs_human_review)
+- Average confidence score
+- Average processing time
 
 ## Importing Workflows into n8n
 
@@ -243,7 +255,7 @@ curl -X POST http://localhost:5678/webhook/slr-test-pubmed-search \
 
 ## Alpha Version Status
 
-The current workflows implement Phase 1-3 functionality:
+The current workflows implement Phase 1-4 functionality:
 
 ✅ **Implemented (Phase 1-2)**:
 - Main coordinator workflow structure
@@ -262,8 +274,18 @@ The current workflows implement Phase 1-3 functionality:
 - Test workflow for quick validation
 - Credentials configuration documentation
 
-🚧 **Pending (Phase 4+)**:
-- Basic screening workflow with Ollama integration
+✅ **Implemented (Phase 4)**:
+- AI-powered title/abstract screening with Ollama LLM
+- PICO-based screening prompt following Cochrane standards
+- Structured JSON output parsing for decisions
+- Confidence score calculation for decision routing
+- Low-confidence routing to human review
+- Rate limiting between LLM calls
+- Error handling for LLM failures
+- Audit logging for all screening decisions
+- Statistics aggregation
+
+🚧 **Pending (Phase 5+)**:
 - Duplicate detection and deduplication
 - Full-text PDF retrieval
 - Data extraction workflows
