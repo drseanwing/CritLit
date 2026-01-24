@@ -63,6 +63,7 @@ services:
     environment:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=slr_database
       - DB_POSTGRESDB_USER=slr_user
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
