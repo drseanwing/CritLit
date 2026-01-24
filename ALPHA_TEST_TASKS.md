@@ -21,7 +21,7 @@ This document outlines the tasks required to go from the current state (specific
 
 ### Infrastructure Setup Tasks
 
-1. Create Docker Compose configuration file with all required services.
+1. ✓ Create Docker Compose configuration file with all required services.
 
 2. Configure PostgreSQL service with required performance parameters.
 
