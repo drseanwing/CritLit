@@ -49,14 +49,22 @@ This directory contains n8n workflow JSON files for the Autonomous Systematic Li
 ```
 
 ### 3. slr_search_execution.json
-**Purpose**: Execute PubMed searches using E-utilities API and store results.
+**Purpose**: Execute PubMed searches using E-utilities API and store results with full document parsing.
 
 **Key Features**:
 - PubMed ESearch API integration with history server
-- PubMed EFetch API for retrieving document metadata
+- PubMed EFetch API for retrieving document metadata in XML format
+- Complete XML parsing to extract structured document data:
+  - Title, authors (with affiliations), abstract (including structured abstracts)
+  - Publication year, journal, DOI, PMID
+  - Study type detection (RCT, Systematic Review, Meta-Analysis, etc.)
+  - MeSH terms, keywords, and publication types
+- Batch processing for large result sets (configurable batch size)
+- Automatic rate limit handling with retry logic
+- Document persistence to PostgreSQL with duplicate detection (upsert on PMID)
 - Search execution logging for PRISMA tracking
-- Rate limit handling with configurable API keys
-- XML parsing preparation (to be implemented in Phase 3)
+- PRISMA flow count updates after document import
+- Comprehensive audit logging
 
 **Trigger**: POST to `/webhook/slr-search-execution` with body:
 ```json
@@ -64,9 +72,31 @@ This directory contains n8n workflow JSON files for the Autonomous Systematic Li
   "review_id": "uuid-of-review",
   "search_query": "(hypertension[MeSH Terms]) AND (SGLT2 inhibitors[MeSH Terms])",
   "database_name": "PubMed",
-  "max_results": 1000
+  "max_results": 1000,
+  "batch_size": 500
 }
 ```
+
+### 5. slr_pubmed_test.json
+**Purpose**: Test workflow for validating PubMed integration with a small search.
+
+**Key Features**:
+- Automatically creates test review record if not exists
+- Uses a small, targeted search query for quick testing
+- Full XML parsing and document storage
+- Verification queries to confirm document persistence
+- Detailed test results with next steps
+
+**Trigger**: POST to `/webhook/slr-test-pubmed-search` with body:
+```json
+{
+  "review_id": "00000000-0000-0000-0000-000000000001",
+  "search_query": "\"SGLT2 inhibitors\"[Title] AND \"systematic review\"[Publication Type] AND 2023[Publication Date]",
+  "max_results": 25
+}
+```
+
+All parameters are optional - defaults are provided for quick testing.
 
 ### 4. slr_screening_batch.json
 **Purpose**: Perform AI-powered title/abstract screening using Ollama LLM.
@@ -101,7 +131,11 @@ This directory contains n8n workflow JSON files for the Autonomous Systematic Li
 
 3. **Configure Credentials**
    
-   Before using the workflows, configure these credentials in n8n:
+   Before using the workflows, configure these credentials in n8n.
+   
+   **See [credentials/README.md](credentials/README.md) for detailed credential configuration instructions.**
+   
+   Quick reference:
    
    - **PostgreSQL (SLR Database)**
      - Host: `postgres` (Docker network) or `localhost` (local)
@@ -110,12 +144,13 @@ This directory contains n8n workflow JSON files for the Autonomous Systematic Li
      - User: `slr_user`
      - Password: From `.env` file (`POSTGRES_PASSWORD`)
    
+   - **PubMed API (HTTP Query Auth)**
+     - Create an HTTP Query Auth credential
+     - Name: `api_key`
+     - Value: From `.env` file (`PUBMED_API_KEY`)
+   
    - **Ollama API**
      - Base URL: `http://ollama:11434` (Docker) or from `.env` (`OLLAMA_BASE_URL`)
-   
-   - **PubMed API (Optional)**
-     - API Key: From `.env` file (`PUBMED_API_KEY`)
-     - Email: From `.env` file (`CONTACT_EMAIL`)
 
 4. **Set Environment Variables**
    
@@ -199,20 +234,36 @@ curl -X POST http://localhost:5678/webhook/slr-screening-batch \
   }'
 ```
 
-## Alpha Version Limitations
+### 4. Quick PubMed Test (creates test review automatically)
+```bash
+curl -X POST http://localhost:5678/webhook/slr-test-pubmed-search \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
 
-The current workflows implement Phase 2 functionality:
+## Alpha Version Status
 
-✅ **Implemented**:
+The current workflows implement Phase 1-3 functionality:
+
+✅ **Implemented (Phase 1-2)**:
 - Main coordinator workflow structure
 - Protocol setup and storage
-- PubMed search execution (ESearch + EFetch)
-- Basic screening workflow with Ollama integration
 - Checkpoint/state management structure
 - Human review wait nodes
 
-🚧 **Pending (Phase 3+)**:
-- Complete PubMed XML parsing and document storage
+✅ **Implemented (Phase 3)**:
+- PubMed search execution (ESearch + EFetch with history server)
+- Complete PubMed XML parsing and document metadata extraction
+- Structured data extraction (title, authors, abstract, DOI, PMID, study type)
+- Batch processing for large result sets
+- Rate limit handling with automatic retry
+- Document persistence with duplicate detection (upsert on PMID)
+- PRISMA flow tracking updates
+- Test workflow for quick validation
+- Credentials configuration documentation
+
+🚧 **Pending (Phase 4+)**:
+- Basic screening workflow with Ollama integration
 - Duplicate detection and deduplication
 - Full-text PDF retrieval
 - Data extraction workflows

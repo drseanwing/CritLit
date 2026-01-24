@@ -42,6 +42,12 @@
               "name": "max_results",
               "value": "={{ $json.body.max_results || 1000 }}",
               "type": "number"
+            },
+            {
+              "id": "extract-batch-size",
+              "name": "batch_size",
+              "value": "={{ $json.body.batch_size || 500 }}",
+              "type": "number"
             }
           ]
         },
@@ -71,7 +77,7 @@
             },
             {
               "name": "retmax",
-              "value": "={{ $json.max_results }}"
+              "value": "0"
             },
             {
               "name": "retmode",
@@ -91,31 +97,66 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "id": "pubmed-esearch-node",
       "name": "PubMed ESearch",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [650, 300]
+      "position": [650, 300],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "pubmed-api-credentials",
+          "name": "PubMed API"
+        }
+      }
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO search_executions (review_id, database_name, search_query, date_executed, results_count, query_metadata)\nVALUES (\n  $1::uuid,\n  $2::text,\n  $3::text,\n  CURRENT_DATE,\n  $4::integer,\n  $5::jsonb\n)\nRETURNING *;",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-rate-limit-esearch",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ]
+        },
         "options": {}
       },
-      "id": "log-search-execution",
-      "name": "Log Search Execution",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [850, 300],
-      "credentials": {
-        "postgres": {
-          "id": "postgres-slr-database",
-          "name": "SLR PostgreSQL"
-        }
-      }
+      "id": "check-esearch-error",
+      "name": "Check ESearch Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "rate-limit-wait-esearch",
+      "name": "Rate Limit Wait ESearch",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [850, 200]
     },
     {
       "parameters": {
@@ -142,14 +183,44 @@
             {
               "id": "prepare-log-count",
               "name": "results_count",
-              "value": "={{ $json.esearchresult.count }}",
+              "value": "={{ parseInt($json.esearchresult.count) || 0 }}",
               "type": "number"
             },
             {
               "id": "prepare-log-metadata",
               "name": "query_metadata",
-              "value": "={{ { \"webenv\": $json.esearchresult.webenv, \"query_key\": $json.esearchresult.querykey, \"retmax\": $json.esearchresult.retmax } }}",
+              "value": "={{ { \"webenv\": $json.esearchresult.webenv, \"query_key\": $json.esearchresult.querykey, \"total_count\": parseInt($json.esearchresult.count) || 0 } }}",
               "type": "object"
+            },
+            {
+              "id": "store-webenv",
+              "name": "webenv",
+              "value": "={{ $json.esearchresult.webenv }}",
+              "type": "string"
+            },
+            {
+              "id": "store-query-key",
+              "name": "query_key",
+              "value": "={{ $json.esearchresult.querykey }}",
+              "type": "string"
+            },
+            {
+              "id": "store-total-count",
+              "name": "total_count",
+              "value": "={{ parseInt($json.esearchresult.count) || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "store-max-results",
+              "name": "max_results",
+              "value": "={{ $('Extract Search Parameters').item.json.max_results }}",
+              "type": "number"
+            },
+            {
+              "id": "store-batch-size",
+              "name": "batch_size",
+              "value": "={{ $('Extract Search Parameters').item.json.batch_size }}",
+              "type": "number"
             }
           ]
         },
@@ -159,12 +230,54 @@
       "name": "Prepare Search Log",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.3,
-      "position": [750, 300]
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO search_executions (review_id, database_name, search_query, date_executed, results_count, query_metadata)\nVALUES (\n  $1::uuid,\n  $2::text,\n  $3::text,\n  CURRENT_DATE,\n  $4::integer,\n  $5::jsonb\n)\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id, $json.database_name, $json.search_query, $json.results_count, JSON.stringify($json.query_metadata)] }}"
+        }
+      },
+      "id": "log-search-execution",
+      "name": "Log Search Execution",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Generate batch parameters for PubMed EFetch API\n * Creates batch items for fetching results in chunks of batch_size\n */\n\nconst input = $input.first();\nconst searchLog = $('Prepare Search Log').first().json;\nconst searchExecution = input.json;\n\nconst totalCount = searchLog.total_count;\nconst maxResults = Math.min(searchLog.max_results, totalCount);\nconst batchSize = searchLog.batch_size;\nconst webenv = searchLog.webenv;\nconst queryKey = searchLog.query_key;\nconst reviewId = searchLog.review_id;\nconst searchExecutionId = searchExecution.id;\n\n// Generate batch items\nconst batches = [];\nfor (let retstart = 0; retstart < maxResults; retstart += batchSize) {\n  const retmax = Math.min(batchSize, maxResults - retstart);\n  batches.push({\n    json: {\n      review_id: reviewId,\n      search_execution_id: searchExecutionId,\n      webenv: webenv,\n      query_key: queryKey,\n      retstart: retstart,\n      retmax: retmax,\n      batch_number: Math.floor(retstart / batchSize) + 1,\n      total_batches: Math.ceil(maxResults / batchSize),\n      total_results: maxResults\n    }\n  });\n}\n\nreturn batches;"
+      },
+      "id": "generate-batch-params",
+      "name": "Generate Batch Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-into-batches",
+      "name": "Split Into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1450, 400]
     },
     {
       "parameters": {
         "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-        "authentication": "none",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -174,19 +287,27 @@
             },
             {
               "name": "query_key",
-              "value": "={{ $('PubMed ESearch').item.json.esearchresult.querykey }}"
+              "value": "={{ $json.query_key }}"
             },
             {
               "name": "WebEnv",
-              "value": "={{ $('PubMed ESearch').item.json.esearchresult.webenv }}"
+              "value": "={{ $json.webenv }}"
+            },
+            {
+              "name": "retstart",
+              "value": "={{ $json.retstart }}"
+            },
+            {
+              "name": "retmax",
+              "value": "={{ $json.retmax }}"
             },
             {
               "name": "retmode",
               "value": "xml"
             },
             {
-              "name": "retmax",
-              "value": "={{ $('Extract Search Parameters').item.json.max_results }}"
+              "name": "rettype",
+              "value": "abstract"
             },
             {
               "name": "api_key",
@@ -198,23 +319,196 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
       },
       "id": "pubmed-efetch-node",
-      "name": "PubMed EFetch",
+      "name": "PubMed EFetch Batch",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1050, 300]
+      "position": [1650, 400],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "pubmed-api-credentials",
+          "name": "PubMed API"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Parse PubMed XML and extract document metadata\nconst xml = $input.item.json;\n\n// For alpha version, we'll process the XML in the next phase\n// This placeholder returns the raw XML for now\nreturn {\n  json: {\n    review_id: $('Extract Search Parameters').item.json.review_id,\n    search_execution_id: $('Log Search Execution').item.json.id,\n    raw_xml: xml,\n    status: 'pending_parse',\n    message: 'Documents fetched successfully. Parsing will be implemented in Phase 3.'\n  }\n};"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-rate-limit-efetch",
+              "leftValue": "={{ $json.error || ($json.data && $json.data.includes && $json.data.includes('error')) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-efetch-error",
+      "name": "Check EFetch Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "rate-limit-wait-efetch",
+      "name": "Rate Limit Wait EFetch",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Parse PubMed XML and extract structured document metadata\n * Input: PubMed EFetch XML response\n * Output: Array of structured document objects ready for database insertion\n */\n\nconst batchInfo = $('Split Into Batches').first().json;\nconst xmlData = $input.first().json.data || $input.first().json;\nconst reviewId = batchInfo.review_id;\nconst searchExecutionId = batchInfo.search_execution_id;\n\n/**\n * Helper function to safely extract text from XML element\n */\nfunction extractText(xml, tagName, defaultValue = null) {\n  const regex = new RegExp(`<${tagName}[^>]*>([\\\\s\\\\S]*?)<\\\\/${tagName}>`, 'i');\n  const match = xml.match(regex);\n  return match ? match[1].trim().replace(/<[^>]+>/g, '').trim() : defaultValue;\n}\n\n/**\n * Helper function to extract all matches of a pattern\n */\nfunction extractAllText(xml, tagName) {\n  const regex = new RegExp(`<${tagName}[^>]*>([\\\\s\\\\S]*?)<\\\\/${tagName}>`, 'gi');\n  const matches = [];\n  let match;\n  while ((match = regex.exec(xml)) !== null) {\n    matches.push(match[1].trim().replace(/<[^>]+>/g, '').trim());\n  }\n  return matches;\n}\n\n/**\n * Extract authors from AuthorList element\n */\nfunction extractAuthors(articleXml) {\n  const authorListMatch = articleXml.match(/<AuthorList[^>]*>([\\s\\S]*?)<\\/AuthorList>/i);\n  if (!authorListMatch) return [];\n  \n  const authorList = authorListMatch[1];\n  const authorRegex = /<Author[^>]*>([\\s\\S]*?)<\\/Author>/gi;\n  const authors = [];\n  let authorMatch;\n  \n  while ((authorMatch = authorRegex.exec(authorList)) !== null) {\n    const authorXml = authorMatch[1];\n    const lastName = extractText(authorXml, 'LastName', '');\n    const foreName = extractText(authorXml, 'ForeName', '');\n    const initials = extractText(authorXml, 'Initials', '');\n    const affiliation = extractText(authorXml, 'Affiliation', null);\n    const orcid = extractText(authorXml, 'Identifier', null);\n    \n    const name = foreName ? `${foreName} ${lastName}` : (initials ? `${initials} ${lastName}` : lastName);\n    \n    if (name) {\n      authors.push({\n        name: name,\n        affiliation: affiliation,\n        orcid: orcid\n      });\n    }\n  }\n  \n  return authors;\n}\n\n/**\n * Extract abstract text, handling structured abstracts\n */\nfunction extractAbstract(articleXml) {\n  const abstractMatch = articleXml.match(/<Abstract[^>]*>([\\s\\S]*?)<\\/Abstract>/i);\n  if (!abstractMatch) return null;\n  \n  const abstractXml = abstractMatch[1];\n  \n  // Check for structured abstract with AbstractText elements\n  const abstractTexts = [];\n  const textRegex = /<AbstractText[^>]*(?:Label=\"([^\"]*)\"|NlmCategory=\"([^\"]*)\"|)[^>]*>([\\s\\S]*?)<\\/AbstractText>/gi;\n  let textMatch;\n  \n  while ((textMatch = textRegex.exec(abstractXml)) !== null) {\n    const label = textMatch[1] || textMatch[2] || '';\n    const text = textMatch[3].trim().replace(/<[^>]+>/g, '').trim();\n    if (label) {\n      abstractTexts.push(`${label}: ${text}`);\n    } else {\n      abstractTexts.push(text);\n    }\n  }\n  \n  if (abstractTexts.length > 0) {\n    return abstractTexts.join('\\n\\n');\n  }\n  \n  // Fallback: extract as single text\n  return abstractMatch[1].replace(/<[^>]+>/g, '').trim();\n}\n\n/**\n * Extract publication year\n */\nfunction extractPublicationYear(articleXml) {\n  // Try PubDate first\n  const pubDateMatch = articleXml.match(/<PubDate[^>]*>([\\s\\S]*?)<\\/PubDate>/i);\n  if (pubDateMatch) {\n    const year = extractText(pubDateMatch[1], 'Year', null);\n    if (year) return parseInt(year);\n    \n    // Check MedlineDate format (e.g., \"2020 Jan-Feb\")\n    const medlineDate = extractText(pubDateMatch[1], 'MedlineDate', null);\n    if (medlineDate) {\n      const yearMatch = medlineDate.match(/^(\\d{4})/);\n      if (yearMatch) return parseInt(yearMatch[1]);\n    }\n  }\n  \n  // Try ArticleDate\n  const articleDateMatch = articleXml.match(/<ArticleDate[^>]*>([\\s\\S]*?)<\\/ArticleDate>/i);\n  if (articleDateMatch) {\n    const year = extractText(articleDateMatch[1], 'Year', null);\n    if (year) return parseInt(year);\n  }\n  \n  return null;\n}\n\n/**\n * Extract DOI from ArticleIdList or ELocationID\n */\nfunction extractDoi(articleXml) {\n  // Try ArticleId with IdType=\"doi\"\n  const doiMatch = articleXml.match(/<ArticleId\\s+IdType=\"doi\"[^>]*>([^<]+)<\\/ArticleId>/i);\n  if (doiMatch) return doiMatch[1].trim();\n  \n  // Try ELocationID with EIdType=\"doi\"\n  const elocMatch = articleXml.match(/<ELocationID\\s+EIdType=\"doi\"[^>]*>([^<]+)<\\/ELocationID>/i);\n  if (elocMatch) return elocMatch[1].trim();\n  \n  return null;\n}\n\n/**\n * Detect study type from MeSH terms and publication types\n */\nfunction detectStudyType(articleXml) {\n  const pubTypes = extractAllText(articleXml, 'PublicationType');\n  const meshTerms = extractAllText(articleXml, 'DescriptorName');\n  \n  const allTerms = [...pubTypes, ...meshTerms].map(t => t.toLowerCase());\n  \n  // Priority-based study type detection\n  if (allTerms.some(t => t.includes('randomized controlled trial') || t.includes('rct'))) {\n    return 'RCT';\n  }\n  if (allTerms.some(t => t.includes('systematic review'))) {\n    return 'Systematic Review';\n  }\n  if (allTerms.some(t => t.includes('meta-analysis'))) {\n    return 'Meta-Analysis';\n  }\n  if (allTerms.some(t => t.includes('cohort'))) {\n    return 'Cohort Study';\n  }\n  if (allTerms.some(t => t.includes('case-control'))) {\n    return 'Case-Control Study';\n  }\n  if (allTerms.some(t => t.includes('cross-sectional'))) {\n    return 'Cross-Sectional Study';\n  }\n  if (allTerms.some(t => t.includes('clinical trial'))) {\n    return 'Clinical Trial';\n  }\n  if (allTerms.some(t => t.includes('observational'))) {\n    return 'Observational Study';\n  }\n  if (allTerms.some(t => t.includes('case report'))) {\n    return 'Case Report';\n  }\n  if (allTerms.some(t => t.includes('review'))) {\n    return 'Review';\n  }\n  \n  return null;\n}\n\n// Parse the XML to extract PubmedArticle elements\nconst articleRegex = /<PubmedArticle>([\\s\\S]*?)<\\/PubmedArticle>/gi;\nconst documents = [];\nlet articleMatch;\n\nwhile ((articleMatch = articleRegex.exec(xmlData)) !== null) {\n  const articleXml = articleMatch[1];\n  \n  // Extract PMID\n  const pmid = extractText(articleXml, 'PMID', null);\n  if (!pmid) continue; // Skip articles without PMID\n  \n  // Extract DOI\n  const doi = extractDoi(articleXml);\n  \n  // Build external_ids object\n  const externalIds = { pmid: pmid };\n  if (doi) externalIds.doi = doi;\n  \n  // Extract title\n  const title = extractText(articleXml, 'ArticleTitle', 'Untitled');\n  \n  // Extract authors\n  const authors = extractAuthors(articleXml);\n  \n  // Extract abstract\n  const abstract = extractAbstract(articleXml);\n  \n  // Extract publication year\n  const publicationYear = extractPublicationYear(articleXml);\n  \n  // Extract journal\n  const journal = extractText(articleXml, 'Title', null) || \n                  extractText(articleXml, 'ISOAbbreviation', null);\n  \n  // Detect study type\n  const studyType = detectStudyType(articleXml);\n  \n  // Build metadata object\n  const metadata = {\n    publication_types: extractAllText(articleXml, 'PublicationType'),\n    mesh_terms: extractAllText(articleXml, 'DescriptorName'),\n    keywords: extractAllText(articleXml, 'Keyword'),\n    language: extractText(articleXml, 'Language', 'eng'),\n    search_execution_id: searchExecutionId\n  };\n  \n  documents.push({\n    json: {\n      review_id: reviewId,\n      external_ids: externalIds,\n      title: title,\n      authors: authors,\n      abstract: abstract,\n      publication_year: publicationYear,\n      journal: journal,\n      study_type: studyType,\n      source_database: 'PubMed',\n      screening_status: 'pending',\n      metadata: metadata\n    }\n  });\n}\n\n// Return parsed documents or a status message if none found\nif (documents.length === 0) {\n  return [{\n    json: {\n      status: 'no_results',\n      review_id: reviewId,\n      search_execution_id: searchExecutionId,\n      batch_number: batchInfo.batch_number,\n      message: 'No PubmedArticle elements found in this batch'\n    }\n  }];\n}\n\nreturn documents;"
       },
       "id": "parse-pubmed-xml",
       "name": "Parse PubMed XML",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [2050, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-no-results",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "no_results",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-parse-results",
+      "name": "Check Parse Results",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2250, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO documents (\n  review_id,\n  external_ids,\n  title,\n  authors,\n  abstract,\n  publication_year,\n  journal,\n  study_type,\n  source_database,\n  screening_status,\n  metadata\n)\nVALUES (\n  $1::uuid,\n  $2::jsonb,\n  $3::text,\n  $4::jsonb,\n  $5::text,\n  $6::integer,\n  $7::varchar(500),\n  $8::varchar(100),\n  $9::varchar(100),\n  $10::varchar(50),\n  $11::jsonb\n)\nON CONFLICT (review_id, (external_ids->>'pmid'))\n  WHERE external_ids->>'pmid' IS NOT NULL\nDO UPDATE SET\n  title = EXCLUDED.title,\n  authors = EXCLUDED.authors,\n  abstract = EXCLUDED.abstract,\n  publication_year = EXCLUDED.publication_year,\n  journal = EXCLUDED.journal,\n  study_type = EXCLUDED.study_type,\n  metadata = documents.metadata || EXCLUDED.metadata,\n  updated_at = NOW()\nRETURNING id, (external_ids->>'pmid') as pmid, title;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id, JSON.stringify($json.external_ids), $json.title, JSON.stringify($json.authors), $json.abstract, $json.publication_year, $json.journal, $json.study_type, $json.source_database, $json.screening_status, JSON.stringify($json.metadata)] }}"
+        }
+      },
+      "id": "save-documents",
+      "name": "Save Documents to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2450, 600],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ $env.PUBMED_API_KEY ? 0.1 : 0.4 }}",
+        "unit": "seconds"
+      },
+      "id": "rate-limit-between-docs",
+      "name": "Rate Limit Between Docs",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2650, 600]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "merge-batch-results",
+      "name": "Merge Batch Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2850, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Aggregate batch processing results for final response\n */\n\nconst batchInfo = $('Split Into Batches').first().json;\nconst savedDocs = $input.all();\n\n// Count successfully saved documents\nconst savedCount = savedDocs.filter(item => item.json.id).length;\nconst skipCount = savedDocs.filter(item => !item.json.id).length;\n\nreturn [{\n  json: {\n    review_id: batchInfo.review_id,\n    search_execution_id: batchInfo.search_execution_id,\n    batch_number: batchInfo.batch_number,\n    total_batches: batchInfo.total_batches,\n    documents_saved: savedCount,\n    documents_skipped: skipCount,\n    status: 'batch_complete'\n  }\n}];"
+      },
+      "id": "aggregate-batch-results",
+      "name": "Aggregate Batch Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3050, 500]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $env.PUBMED_API_KEY ? 0.2 : 0.5 }}",
+        "unit": "seconds"
+      },
+      "id": "rate-limit-between-batches",
+      "name": "Rate Limit Between Batches",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3250, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO audit_log (review_id, event_type, event_data, created_at)\nVALUES (\n  $1::uuid,\n  'search_executed',\n  $2::jsonb,\n  NOW()\n)\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare Search Log').first().json.review_id, JSON.stringify({ search_execution_id: $('Log Search Execution').first().json.id, database_name: $('Prepare Search Log').first().json.database_name, results_count: $('Prepare Search Log').first().json.results_count })] }}"
+        }
+      },
+      "id": "audit-search-execution",
+      "name": "Audit Search Execution",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Generate final response with complete search execution summary\n */\n\nconst searchLog = $('Prepare Search Log').first().json;\nconst searchExecution = $('Log Search Execution').first().json;\nconst batchResults = $input.all();\n\n// Calculate totals from batch results\nlet totalSaved = 0;\nlet totalSkipped = 0;\nlet batchesCompleted = 0;\n\nfor (const batch of batchResults) {\n  if (batch.json.documents_saved !== undefined) {\n    totalSaved += batch.json.documents_saved;\n    totalSkipped += batch.json.documents_skipped || 0;\n    batchesCompleted++;\n  }\n}\n\nreturn [{\n  json: {\n    success: true,\n    review_id: searchLog.review_id,\n    search_execution_id: searchExecution.id,\n    database_name: searchLog.database_name,\n    search_query: searchLog.search_query,\n    total_results_found: searchLog.total_count,\n    results_requested: searchLog.max_results,\n    documents_saved: totalSaved,\n    documents_skipped: totalSkipped,\n    batches_completed: batchesCompleted,\n    total_batches: Math.ceil(Math.min(searchLog.max_results, searchLog.total_count) / searchLog.batch_size),\n    webenv: searchLog.webenv,\n    query_key: searchLog.query_key,\n    message: `Search execution complete. ${totalSaved} documents saved to database.`\n  }\n}];"
+      },
+      "id": "generate-final-response",
+      "name": "Generate Final Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3450, 400]
     },
     {
       "parameters": {
@@ -225,51 +519,50 @@
       "name": "Respond Search Complete",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1450, 300]
+      "position": [3650, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Handle ESearch error - return error response\n */\n\nconst searchParams = $('Extract Search Parameters').first().json;\nconst error = $input.first().json;\n\nreturn [{\n  json: {\n    success: false,\n    review_id: searchParams.review_id,\n    error: 'PubMed ESearch API error',\n    details: error.error || error.message || 'Unknown error',\n    suggestion: 'Check your API key and query syntax. The API may be rate-limited or temporarily unavailable.',\n    search_query: searchParams.search_query\n  }\n}];"
+      },
+      "id": "handle-esearch-error",
+      "name": "Handle ESearch Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 100]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO audit_log (review_id, event_type, event_data, created_at)\nVALUES (\n  $1::uuid,\n  'search_executed',\n  $2::jsonb,\n  NOW()\n)\nRETURNING *;",
-        "options": {}
+        "query": "UPDATE prisma_flow\nSET \n  records_identified = records_identified || jsonb_build_object('PubMed', $2::integer),\n  records_screened = records_screened + $2::integer,\n  updated_at = NOW()\nWHERE review_id = $1::uuid\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare Search Log').first().json.review_id, $json.documents_saved] }}"
+        }
       },
-      "id": "audit-search-execution",
-      "name": "Audit Search Execution",
+      "id": "update-prisma-flow",
+      "name": "Update PRISMA Flow",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [950, 300],
+      "position": [3250, 300],
       "credentials": {
         "postgres": {
           "id": "postgres-slr-database",
           "name": "SLR PostgreSQL"
         }
       }
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "prepare-audit-review-id",
-              "name": "review_id",
-              "value": "={{ $('Extract Search Parameters').item.json.review_id }}",
-              "type": "string"
-            },
-            {
-              "id": "prepare-audit-event-data",
-              "name": "event_data",
-              "value": "={{ { \"search_execution_id\": $json.id, \"database_name\": $json.database_name, \"results_count\": $json.results_count } }}",
-              "type": "object"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "prepare-audit-data",
-      "name": "Prepare Audit Data",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [850, 400]
     }
   ],
   "connections": {
@@ -299,7 +592,54 @@
       "main": [
         [
           {
+            "node": "Check ESearch Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Wait ESearch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check ESearch Error": {
+      "main": [
+        [
+          {
+            "node": "Handle ESearch Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Prepare Search Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Wait ESearch": {
+      "main": [
+        [
+          {
+            "node": "PubMed ESearch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle ESearch Error": {
+      "main": [
+        [
+          {
+            "node": "Respond Error",
             "type": "main",
             "index": 0
           }
@@ -313,29 +653,7 @@
             "node": "Log Search Execution",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Log Search Execution": {
-      "main": [
-        [
-          {
-            "node": "Prepare Audit Data",
-            "type": "main",
-            "index": 0
           },
-          {
-            "node": "PubMed EFetch",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Audit Data": {
-      "main": [
-        [
           {
             "node": "Audit Search Execution",
             "type": "main",
@@ -344,8 +662,73 @@
         ]
       ]
     },
-    "PubMed EFetch": {
+    "Log Search Execution": {
       "main": [
+        [
+          {
+            "node": "Generate Batch Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Batch Parameters": {
+      "main": [
+        [
+          {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Batches": {
+      "main": [
+        [
+          {
+            "node": "PubMed EFetch Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PubMed EFetch Batch": {
+      "main": [
+        [
+          {
+            "node": "Check EFetch Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Wait EFetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check EFetch Error": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Wait EFetch",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Parse PubMed XML",
@@ -355,7 +738,107 @@
         ]
       ]
     },
+    "Rate Limit Wait EFetch": {
+      "main": [
+        [
+          {
+            "node": "PubMed EFetch Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Parse PubMed XML": {
+      "main": [
+        [
+          {
+            "node": "Check Parse Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Parse Results": {
+      "main": [
+        [
+          {
+            "node": "Merge Batch Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Documents to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Documents to Database": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Between Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Between Docs": {
+      "main": [
+        [
+          {
+            "node": "Merge Batch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Batch Results": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Batch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Batch Results": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Between Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Between Batches": {
+      "main": [
+        [
+          {
+            "node": "Update PRISMA Flow",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Final Response": {
       "main": [
         [
           {
@@ -369,11 +852,12 @@
   },
   "pinData": {},
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "errorWorkflow": "slr-error-handler"
   },
   "staticData": null,
-  "tags": [],
+  "tags": ["slr", "pubmed", "search"],
   "triggerCount": 1,
-  "updatedAt": "2026-01-24T14:17:58.607Z",
-  "versionId": "1"
+  "updatedAt": "2026-01-24T15:03:45.397Z",
+  "versionId": "2"
 }

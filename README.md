@@ -229,11 +229,22 @@ ORDER BY updated_at DESC LIMIT 1;
 - [x] Screening batch workflow with Ollama LLM
 - [x] Workflow documentation and testing guide
 
-### 🚧 In Progress (Phase 3-10)
+**Phase 3: PubMed Integration (tasks 39-48)**
+- [x] PubMed API credentials configuration documentation
+- [x] PubMed ESearch API with history server support
+- [x] PubMed EFetch API with XML retrieval
+- [x] Complete XML parsing for document metadata extraction
+- [x] Structured data extraction (authors, abstracts, DOI, study types)
+- [x] PostgreSQL document persistence with upsert on PMID
+- [x] Rate limit error handling with automatic retry
+- [x] Batch processing for large result sets
+- [x] Search execution logging and PRISMA tracking
+- [x] Test workflow for PubMed integration validation
+
+### 🚧 In Progress (Phase 4-10)
 
 See [ALPHA_TEST_TASKS.md](ALPHA_TEST_TASKS.md) for complete task list:
 
-- Phase 3: PubMed Integration (tasks 39-48)
 - Phase 4: Screening Agent Implementation (tasks 49-62)
 - Phase 5: Checkpoint and Resume (tasks 63-71)
 - Phase 6: PRISMA Flow Tracking (tasks 72-78)
@@ -266,6 +277,6 @@ Built following the "Ralph Playbook" pattern for multi-agent orchestration with 
 
 ---
 
-**Version**: Alpha 0.2  
+**Version**: Alpha 0.3  
 **Last Updated**: 2026-01-24  
-**Status**: Phase 1 & 2 Complete, Phase 3 In Progress
+**Status**: Phase 1, 2 & 3 Complete, Phase 4 In Progress

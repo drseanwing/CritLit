@@ -1,0 +1,614 @@
+{
+  "name": "SLR PubMed Test Search",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "slr-test-pubmed-search",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-test",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "slr-test-pubmed-search-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Set up test parameters for a small PubMed search\n * This uses a specific query designed to return a small, manageable result set\n */\n\nconst input = $input.first();\nconst body = input.json.body || {};\n\n// Use provided values or defaults for testing\nconst reviewId = body.review_id || '00000000-0000-0000-0000-000000000001';\nconst searchQuery = body.search_query || '\"SGLT2 inhibitors\"[Title] AND \"systematic review\"[Publication Type] AND 2023[Publication Date]';\nconst maxResults = body.max_results || 25;\n\nreturn [{\n  json: {\n    review_id: reviewId,\n    search_query: searchQuery,\n    database_name: 'PubMed',\n    max_results: maxResults,\n    batch_size: 50,\n    test_mode: true\n  }\n}];"
+      },
+      "id": "setup-test-params",
+      "name": "Setup Test Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Ensure test review exists\nINSERT INTO reviews (id, title, status, pico, inclusion_criteria, exclusion_criteria, search_strategy)\nVALUES (\n  $1::uuid,\n  'Test Review: SGLT2 Inhibitors Systematic Reviews',\n  'searching',\n  '{\"population\": \"adults with type 2 diabetes\", \"intervention\": \"SGLT2 inhibitors\", \"comparator\": \"placebo or standard care\", \"outcomes\": [\"HbA1c reduction\", \"cardiovascular events\"], \"study_types\": [\"systematic review\"]}',\n  '{\"language\": [\"English\"], \"min_year\": 2020}',\n  '{\"study_types\": [\"case report\", \"editorial\"]}',\n  $2::text\n)\nON CONFLICT (id) DO UPDATE SET\n  status = 'searching',\n  updated_at = NOW()\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id, $json.search_query] }}"
+        }
+      },
+      "id": "ensure-test-review",
+      "name": "Ensure Test Review Exists",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Ensure PRISMA flow record exists for this review\nINSERT INTO prisma_flow (review_id, flow_version, records_identified, duplicates_removed, records_screened, records_excluded_screening, studies_included)\nVALUES (\n  $1::uuid,\n  1,\n  '{}'::jsonb,\n  0,\n  0,\n  0,\n  0\n)\nON CONFLICT (review_id, flow_version) DO NOTHING\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$('Setup Test Parameters').first().json.review_id] }}"
+        }
+      },
+      "id": "ensure-prisma-flow",
+      "name": "Ensure PRISMA Flow Record",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "db",
+              "value": "pubmed"
+            },
+            {
+              "name": "term",
+              "value": "={{ $('Setup Test Parameters').first().json.search_query }}"
+            },
+            {
+              "name": "retmax",
+              "value": "0"
+            },
+            {
+              "name": "retmode",
+              "value": "json"
+            },
+            {
+              "name": "usehistory",
+              "value": "y"
+            },
+            {
+              "name": "api_key",
+              "value": "={{ $env.PUBMED_API_KEY }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $env.CONTACT_EMAIL }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "test-esearch",
+      "name": "Test PubMed ESearch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "pubmed-api-credentials",
+          "name": "PubMed API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-esearch-success",
+              "leftValue": "={{ $json.esearchresult && $json.esearchresult.count !== undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-esearch-success",
+      "name": "Check ESearch Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "store-test-webenv",
+              "name": "webenv",
+              "value": "={{ $json.esearchresult.webenv }}",
+              "type": "string"
+            },
+            {
+              "id": "store-test-query-key",
+              "name": "query_key",
+              "value": "={{ $json.esearchresult.querykey }}",
+              "type": "string"
+            },
+            {
+              "id": "store-test-count",
+              "name": "total_count",
+              "value": "={{ parseInt($json.esearchresult.count) || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "store-test-review-id",
+              "name": "review_id",
+              "value": "={{ $('Setup Test Parameters').first().json.review_id }}",
+              "type": "string"
+            },
+            {
+              "id": "store-test-search-query",
+              "name": "search_query",
+              "value": "={{ $('Setup Test Parameters').first().json.search_query }}",
+              "type": "string"
+            },
+            {
+              "id": "store-test-max-results",
+              "name": "max_results",
+              "value": "={{ $('Setup Test Parameters').first().json.max_results }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-test-fetch",
+      "name": "Prepare Test Fetch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO search_executions (review_id, database_name, search_query, date_executed, results_count, query_metadata)\nVALUES (\n  $1::uuid,\n  'PubMed',\n  $2::text,\n  CURRENT_DATE,\n  $3::integer,\n  $4::jsonb\n)\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id, $json.search_query, $json.total_count, JSON.stringify({webenv: $json.webenv, query_key: $json.query_key, test_mode: true})] }}"
+        }
+      },
+      "id": "log-test-search",
+      "name": "Log Test Search Execution",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1650, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "db",
+              "value": "pubmed"
+            },
+            {
+              "name": "query_key",
+              "value": "={{ $('Prepare Test Fetch').first().json.query_key }}"
+            },
+            {
+              "name": "WebEnv",
+              "value": "={{ $('Prepare Test Fetch').first().json.webenv }}"
+            },
+            {
+              "name": "retstart",
+              "value": "0"
+            },
+            {
+              "name": "retmax",
+              "value": "={{ Math.min($('Prepare Test Fetch').first().json.max_results, $('Prepare Test Fetch').first().json.total_count) }}"
+            },
+            {
+              "name": "retmode",
+              "value": "xml"
+            },
+            {
+              "name": "rettype",
+              "value": "abstract"
+            },
+            {
+              "name": "api_key",
+              "value": "={{ $env.PUBMED_API_KEY }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $env.CONTACT_EMAIL }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "test-efetch",
+      "name": "Test PubMed EFetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 400],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "pubmed-api-credentials",
+          "name": "PubMed API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Parse PubMed XML and extract structured document metadata\n * Same parsing logic as main search execution workflow\n */\n\nconst testParams = $('Prepare Test Fetch').first().json;\nconst searchExecution = $('Log Test Search Execution').first().json;\nconst xmlData = $input.first().json.data || $input.first().json;\nconst reviewId = testParams.review_id;\nconst searchExecutionId = searchExecution.id;\n\n/**\n * Helper function to safely extract text from XML element\n */\nfunction extractText(xml, tagName, defaultValue = null) {\n  const regex = new RegExp(`<${tagName}[^>]*>([\\\\s\\\\S]*?)<\\\\/${tagName}>`, 'i');\n  const match = xml.match(regex);\n  return match ? match[1].trim().replace(/<[^>]+>/g, '').trim() : defaultValue;\n}\n\n/**\n * Helper function to extract all matches of a pattern\n */\nfunction extractAllText(xml, tagName) {\n  const regex = new RegExp(`<${tagName}[^>]*>([\\\\s\\\\S]*?)<\\\\/${tagName}>`, 'gi');\n  const matches = [];\n  let match;\n  while ((match = regex.exec(xml)) !== null) {\n    matches.push(match[1].trim().replace(/<[^>]+>/g, '').trim());\n  }\n  return matches;\n}\n\n/**\n * Extract authors from AuthorList element\n */\nfunction extractAuthors(articleXml) {\n  const authorListMatch = articleXml.match(/<AuthorList[^>]*>([\\s\\S]*?)<\\/AuthorList>/i);\n  if (!authorListMatch) return [];\n  \n  const authorList = authorListMatch[1];\n  const authorRegex = /<Author[^>]*>([\\s\\S]*?)<\\/Author>/gi;\n  const authors = [];\n  let authorMatch;\n  \n  while ((authorMatch = authorRegex.exec(authorList)) !== null) {\n    const authorXml = authorMatch[1];\n    const lastName = extractText(authorXml, 'LastName', '');\n    const foreName = extractText(authorXml, 'ForeName', '');\n    const initials = extractText(authorXml, 'Initials', '');\n    const affiliation = extractText(authorXml, 'Affiliation', null);\n    \n    const name = foreName ? `${foreName} ${lastName}` : (initials ? `${initials} ${lastName}` : lastName);\n    \n    if (name) {\n      authors.push({\n        name: name,\n        affiliation: affiliation\n      });\n    }\n  }\n  \n  return authors;\n}\n\n/**\n * Extract abstract text, handling structured abstracts\n */\nfunction extractAbstract(articleXml) {\n  const abstractMatch = articleXml.match(/<Abstract[^>]*>([\\s\\S]*?)<\\/Abstract>/i);\n  if (!abstractMatch) return null;\n  \n  const abstractXml = abstractMatch[1];\n  \n  // Check for structured abstract\n  const abstractTexts = [];\n  const textRegex = /<AbstractText[^>]*(?:Label=\"([^\"]*)\"|)[^>]*>([\\s\\S]*?)<\\/AbstractText>/gi;\n  let textMatch;\n  \n  while ((textMatch = textRegex.exec(abstractXml)) !== null) {\n    const label = textMatch[1] || '';\n    const text = textMatch[2].trim().replace(/<[^>]+>/g, '').trim();\n    if (label) {\n      abstractTexts.push(`${label}: ${text}`);\n    } else {\n      abstractTexts.push(text);\n    }\n  }\n  \n  if (abstractTexts.length > 0) {\n    return abstractTexts.join('\\n\\n');\n  }\n  \n  return abstractMatch[1].replace(/<[^>]+>/g, '').trim();\n}\n\n/**\n * Extract publication year\n */\nfunction extractPublicationYear(articleXml) {\n  const pubDateMatch = articleXml.match(/<PubDate[^>]*>([\\s\\S]*?)<\\/PubDate>/i);\n  if (pubDateMatch) {\n    const year = extractText(pubDateMatch[1], 'Year', null);\n    if (year) return parseInt(year);\n    \n    const medlineDate = extractText(pubDateMatch[1], 'MedlineDate', null);\n    if (medlineDate) {\n      const yearMatch = medlineDate.match(/^(\\d{4})/);\n      if (yearMatch) return parseInt(yearMatch[1]);\n    }\n  }\n  \n  return null;\n}\n\n/**\n * Extract DOI\n */\nfunction extractDoi(articleXml) {\n  const doiMatch = articleXml.match(/<ArticleId\\s+IdType=\"doi\"[^>]*>([^<]+)<\\/ArticleId>/i);\n  if (doiMatch) return doiMatch[1].trim();\n  \n  const elocMatch = articleXml.match(/<ELocationID\\s+EIdType=\"doi\"[^>]*>([^<]+)<\\/ELocationID>/i);\n  if (elocMatch) return elocMatch[1].trim();\n  \n  return null;\n}\n\n// Parse the XML to extract PubmedArticle elements\nconst articleRegex = /<PubmedArticle>([\\s\\S]*?)<\\/PubmedArticle>/gi;\nconst documents = [];\nlet articleMatch;\n\nwhile ((articleMatch = articleRegex.exec(xmlData)) !== null) {\n  const articleXml = articleMatch[1];\n  \n  const pmid = extractText(articleXml, 'PMID', null);\n  if (!pmid) continue;\n  \n  const doi = extractDoi(articleXml);\n  const externalIds = { pmid: pmid };\n  if (doi) externalIds.doi = doi;\n  \n  const title = extractText(articleXml, 'ArticleTitle', 'Untitled');\n  const authors = extractAuthors(articleXml);\n  const abstract = extractAbstract(articleXml);\n  const publicationYear = extractPublicationYear(articleXml);\n  const journal = extractText(articleXml, 'Title', null) || \n                  extractText(articleXml, 'ISOAbbreviation', null);\n  \n  const pubTypes = extractAllText(articleXml, 'PublicationType');\n  let studyType = null;\n  if (pubTypes.some(t => t.toLowerCase().includes('systematic review'))) {\n    studyType = 'Systematic Review';\n  } else if (pubTypes.some(t => t.toLowerCase().includes('meta-analysis'))) {\n    studyType = 'Meta-Analysis';\n  } else if (pubTypes.some(t => t.toLowerCase().includes('randomized controlled trial'))) {\n    studyType = 'RCT';\n  }\n  \n  const metadata = {\n    publication_types: pubTypes,\n    mesh_terms: extractAllText(articleXml, 'DescriptorName'),\n    keywords: extractAllText(articleXml, 'Keyword'),\n    search_execution_id: searchExecutionId,\n    test_mode: true\n  };\n  \n  documents.push({\n    json: {\n      review_id: reviewId,\n      external_ids: externalIds,\n      title: title,\n      authors: authors,\n      abstract: abstract,\n      publication_year: publicationYear,\n      journal: journal,\n      study_type: studyType,\n      source_database: 'PubMed',\n      screening_status: 'pending',\n      metadata: metadata\n    }\n  });\n}\n\nif (documents.length === 0) {\n  return [{\n    json: {\n      status: 'no_results',\n      review_id: reviewId,\n      search_execution_id: searchExecutionId,\n      message: 'No PubmedArticle elements found in response'\n    }\n  }];\n}\n\nreturn documents;"
+      },
+      "id": "parse-test-xml",
+      "name": "Parse Test XML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-has-documents",
+              "leftValue": "={{ $json.external_ids !== undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-has-documents",
+      "name": "Check Has Documents",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2250, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO documents (\n  review_id,\n  external_ids,\n  title,\n  authors,\n  abstract,\n  publication_year,\n  journal,\n  study_type,\n  source_database,\n  screening_status,\n  metadata\n)\nVALUES (\n  $1::uuid,\n  $2::jsonb,\n  $3::text,\n  $4::jsonb,\n  $5::text,\n  $6::integer,\n  $7::varchar(500),\n  $8::varchar(100),\n  $9::varchar(100),\n  $10::varchar(50),\n  $11::jsonb\n)\nON CONFLICT (review_id, (external_ids->>'pmid'))\n  WHERE external_ids->>'pmid' IS NOT NULL\nDO UPDATE SET\n  title = EXCLUDED.title,\n  authors = EXCLUDED.authors,\n  abstract = EXCLUDED.abstract,\n  updated_at = NOW()\nRETURNING id, (external_ids->>'pmid') as pmid, title;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id, JSON.stringify($json.external_ids), $json.title, JSON.stringify($json.authors), $json.abstract, $json.publication_year, $json.journal, $json.study_type, $json.source_database, $json.screening_status, JSON.stringify($json.metadata)] }}"
+        }
+      },
+      "id": "save-test-documents",
+      "name": "Save Test Documents",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2450, 500],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  COUNT(*) as document_count,\n  COUNT(DISTINCT (external_ids->>'pmid')) as unique_pmids,\n  MIN(publication_year) as earliest_year,\n  MAX(publication_year) as latest_year\nFROM documents\nWHERE review_id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare Test Fetch').first().json.review_id] }}"
+        }
+      },
+      "id": "verify-documents",
+      "name": "Verify Documents Saved",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2650, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Generate test results summary\n */\n\nconst testParams = $('Prepare Test Fetch').first().json;\nconst searchExecution = $('Log Test Search Execution').first().json;\nconst verifyResult = $input.first().json;\nconst savedDocs = $('Save Test Documents').all();\n\nconst successCount = savedDocs.filter(d => d.json.id).length;\n\nreturn [{\n  json: {\n    success: true,\n    test_mode: true,\n    review_id: testParams.review_id,\n    search_execution_id: searchExecution.id,\n    search_query: testParams.search_query,\n    results_from_pubmed: testParams.total_count,\n    results_requested: testParams.max_results,\n    documents_parsed: savedDocs.length,\n    documents_saved: successCount,\n    verification: {\n      total_documents_in_db: parseInt(verifyResult.document_count) || 0,\n      unique_pmids: parseInt(verifyResult.unique_pmids) || 0,\n      year_range: `${verifyResult.earliest_year || 'N/A'} - ${verifyResult.latest_year || 'N/A'}`\n    },\n    message: `Test search completed successfully. ${successCount} documents saved to database.`,\n    next_steps: [\n      'Verify documents in database: SELECT * FROM documents WHERE review_id = \\'' + testParams.review_id + '\\' LIMIT 5;',\n      'Run screening workflow on test documents',\n      'Check PRISMA flow counts'\n    ]\n  }\n}];"
+      },
+      "id": "generate-test-results",
+      "name": "Generate Test Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2850, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-test-complete",
+      "name": "Respond Test Complete",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3050, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Handle ESearch failure\n */\n\nconst testParams = $('Setup Test Parameters').first().json;\nconst error = $input.first().json;\n\nreturn [{\n  json: {\n    success: false,\n    test_mode: true,\n    review_id: testParams.review_id,\n    search_query: testParams.search_query,\n    error: 'PubMed ESearch API failed',\n    details: error.error || error.message || 'Unknown error',\n    suggestions: [\n      'Check if PUBMED_API_KEY environment variable is set',\n      'Check if CONTACT_EMAIL environment variable is set',\n      'Verify the search query syntax is correct',\n      'Check NCBI API status: https://www.ncbi.nlm.nih.gov/status'\n    ]\n  }\n}];"
+      },
+      "id": "handle-test-error",
+      "name": "Handle Test Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-test-error",
+      "name": "Respond Test Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1650, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Setup Test Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Test Parameters": {
+      "main": [
+        [
+          {
+            "node": "Ensure Test Review Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Test Review Exists": {
+      "main": [
+        [
+          {
+            "node": "Ensure PRISMA Flow Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure PRISMA Flow Record": {
+      "main": [
+        [
+          {
+            "node": "Test PubMed ESearch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test PubMed ESearch": {
+      "main": [
+        [
+          {
+            "node": "Check ESearch Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Test Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check ESearch Success": {
+      "main": [
+        [
+          {
+            "node": "Prepare Test Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Test Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Test Fetch": {
+      "main": [
+        [
+          {
+            "node": "Log Test Search Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Test Search Execution": {
+      "main": [
+        [
+          {
+            "node": "Test PubMed EFetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test PubMed EFetch": {
+      "main": [
+        [
+          {
+            "node": "Parse Test XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Test XML": {
+      "main": [
+        [
+          {
+            "node": "Check Has Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Has Documents": {
+      "main": [
+        [
+          {
+            "node": "Verify Documents Saved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Test Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Test Documents": {
+      "main": [
+        [
+          {
+            "node": "Verify Documents Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Documents Saved": {
+      "main": [
+        [
+          {
+            "node": "Generate Test Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Test Results": {
+      "main": [
+        [
+          {
+            "node": "Respond Test Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Test Error": {
+      "main": [
+        [
+          {
+            "node": "Respond Test Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["slr", "pubmed", "test"],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-24T15:03:45.397Z",
+  "versionId": "1"
+}
