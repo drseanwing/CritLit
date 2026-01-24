@@ -169,23 +169,23 @@ This document outlines the tasks required to go from the current state (specific
 
 ### State Management Tasks
 
-63. Create checkpoint data structure schema for workflow state serialization.
+63. ✓ Create checkpoint data structure schema for workflow state serialization.
 
-64. Configure workflow state upsert node to save checkpoint after each batch.
+64. ✓ Configure workflow state upsert node to save checkpoint after each batch.
 
-65. Create resume logic to query last checkpoint for continuation.
+65. ✓ Create resume logic to query last checkpoint for continuation.
 
-66. Configure error recovery node to roll back to last checkpoint on failure.
+66. ✓ Configure error recovery node to roll back to last checkpoint on failure.
 
-67. Create checkpoint validation query to verify state consistency.
+67. ✓ Create checkpoint validation query to verify state consistency.
 
-68. Create manual resume trigger webhook for restarting failed workflows.
+68. ✓ Create manual resume trigger webhook for restarting failed workflows.
 
-69. Configure audit logging for checkpoint creation events.
+69. ✓ Configure audit logging for checkpoint creation events.
 
-70. Test checkpoint creation by interrupting workflow mid-execution.
+70. Test checkpoint creation by interrupting workflow mid-execution. (Manual testing required)
 
-71. Test resume functionality by restarting from saved checkpoint.
+71. Test resume functionality by restarting from saved checkpoint. (Manual testing required)
 
 ---
 
@@ -193,19 +193,19 @@ This document outlines the tasks required to go from the current state (specific
 
 ### Reporting Infrastructure Tasks
 
-72. Create PRISMA flow calculation query for records identified count.
+72. ✓ Create PRISMA flow calculation query for records identified count.
 
-73. Create PRISMA flow calculation query for duplicates removed count.
+73. ✓ Create PRISMA flow calculation query for duplicates removed count.
 
-74. Create PRISMA flow calculation query for records screened count.
+74. ✓ Create PRISMA flow calculation query for records screened count.
 
-75. Create PRISMA flow calculation query for records excluded at screening stage.
+75. ✓ Create PRISMA flow calculation query for records excluded at screening stage.
 
-76. Configure PostgreSQL node to upsert PRISMA flow data after screening completion.
+76. ✓ Configure PostgreSQL node to upsert PRISMA flow data after screening completion.
 
-77. Create query node to retrieve current PRISMA flow data for display.
+77. ✓ Create query node to retrieve current PRISMA flow data for display.
 
-78. Create code node to format PRISMA counts for human-readable output.
+78. ✓ Create code node to format PRISMA counts for human-readable output.
 
 ---
 

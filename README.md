@@ -255,12 +255,26 @@ ORDER BY updated_at DESC LIMIT 1;
 - [x] Error handling for Ollama failures
 - [x] Screening stage router in coordinator workflow
 
-### 🚧 In Progress (Phase 5-10)
+**Phase 5: Checkpoint and Resume (tasks 63-71)**
+- [x] Checkpoint data structure schema for workflow state serialization
+- [x] Resume logic to query last checkpoint for continuation
+- [x] Checkpoint validation query to verify state consistency
+- [x] Manual resume trigger webhook for restarting failed workflows
+- [x] Audit logging for checkpoint events
+- [x] List active checkpoints endpoint
+
+**Phase 6: PRISMA Flow Tracking (tasks 72-78)**
+- [x] PRISMA flow calculation queries for all counts
+- [x] Records identified, duplicates removed, records screened queries
+- [x] Records excluded with exclusion reasons tracking
+- [x] PostgreSQL upsert for PRISMA flow data
+- [x] Versioned PRISMA flow history
+- [x] Human-readable PRISMA output formatting
+
+### 🚧 In Progress (Phase 7-10)
 
 See [ALPHA_TEST_TASKS.md](ALPHA_TEST_TASKS.md) for complete task list:
 
-- Phase 5: Checkpoint and Resume (tasks 63-71)
-- Phase 6: PRISMA Flow Tracking (tasks 72-78)
 - Phase 7: Basic Human Review Interface (tasks 79-85)
 - Phase 8: Integration Testing (tasks 86-104)
 - Phase 9: Alpha Documentation (tasks 105-116)
@@ -290,6 +304,6 @@ Built following the "Ralph Playbook" pattern for multi-agent orchestration with 
 
 ---
 
-**Version**: Alpha 0.4  
+**Version**: Alpha 0.5  
 **Last Updated**: 2026-01-24  
-**Status**: Phase 1-4 Complete, Phase 5 In Progress
+**Status**: Phase 1-6 Complete, Phase 7 In Progress

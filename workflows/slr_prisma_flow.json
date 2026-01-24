@@ -1,0 +1,311 @@
+{
+  "name": "SLR PRISMA Flow Tracking",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "slr-prisma-flow",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-prisma",
+      "name": "Get PRISMA Flow Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "slr-prisma-flow-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Task 72-75: PRISMA flow calculation queries for all counts\nWITH \n-- Task 72: Records identified count (from search_executions)\nrecords_identified AS (\n  SELECT \n    review_id,\n    jsonb_object_agg(database_name, results_count) as by_database,\n    SUM(results_count) as total\n  FROM search_executions\n  WHERE review_id = $1::uuid\n  GROUP BY review_id\n),\n-- Task 73: Duplicates removed count\nduplicates_removed AS (\n  SELECT \n    review_id,\n    COUNT(*) as count\n  FROM documents\n  WHERE review_id = $1::uuid\n    AND is_duplicate = TRUE\n  GROUP BY review_id\n),\n-- Task 74: Records screened count\nrecords_screened AS (\n  SELECT \n    COUNT(DISTINCT document_id) as count\n  FROM screening_decisions\n  WHERE review_id = $1::uuid\n    AND screening_stage = 'title_abstract'\n),\n-- Task 75: Records excluded at screening stage with reasons\nrecords_excluded AS (\n  SELECT \n    COUNT(*) as total_excluded,\n    jsonb_agg(\n      jsonb_build_object('reason', exclusion_reason, 'count', reason_count)\n    ) as by_reason\n  FROM (\n    SELECT \n      COALESCE(exclusion_reason, 'unspecified') as exclusion_reason,\n      COUNT(*) as reason_count\n    FROM screening_decisions\n    WHERE review_id = $1::uuid\n      AND screening_stage = 'title_abstract'\n      AND decision = 'exclude'\n    GROUP BY exclusion_reason\n  ) subq\n),\n-- Records included count\nrecords_included AS (\n  SELECT \n    COUNT(*) as count\n  FROM screening_decisions\n  WHERE review_id = $1::uuid\n    AND screening_stage = 'title_abstract'\n    AND decision = 'include'\n),\n-- Records pending human review\nrecords_pending_review AS (\n  SELECT \n    COUNT(*) as count\n  FROM documents d\n  WHERE d.review_id = $1::uuid\n    AND d.screening_status = 'needs_review'\n),\n-- Total documents in review\ntotal_documents AS (\n  SELECT \n    COUNT(*) as count\n  FROM documents\n  WHERE review_id = $1::uuid\n    AND is_duplicate = FALSE\n)\nSELECT \n  $1::uuid as review_id,\n  COALESCE(ri.by_database, '{}'::jsonb) as records_identified_by_database,\n  COALESCE(ri.total, 0) as records_identified_total,\n  COALESCE(dr.count, 0) as duplicates_removed,\n  td.count as total_documents_after_dedup,\n  COALESCE(rs.count, 0) as records_screened,\n  COALESCE(re.total_excluded, 0) as records_excluded_screening,\n  COALESCE(re.by_reason, '[]'::jsonb) as exclusion_reasons,\n  COALESCE(rin.count, 0) as records_included,\n  COALESCE(rpr.count, 0) as records_pending_review,\n  (td.count - COALESCE(rs.count, 0)) as records_not_yet_screened\nFROM total_documents td\nLEFT JOIN records_identified ri ON TRUE\nLEFT JOIN duplicates_removed dr ON TRUE\nCROSS JOIN records_screened rs\nCROSS JOIN records_excluded re\nCROSS JOIN records_included rin\nCROSS JOIN records_pending_review rpr;",
+        "options": {
+          "queryReplacement": "={{ [$json.query.review_id] }}"
+        }
+      },
+      "id": "calculate-prisma-counts",
+      "name": "Calculate PRISMA Counts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Task 78: Format PRISMA counts for human-readable output\n */\n\nconst data = $input.first().json;\n\n// Build PRISMA 2020 flow diagram structure\nconst prismaFlow = {\n  review_id: data.review_id,\n  generated_at: new Date().toISOString(),\n  \n  // Identification section\n  identification: {\n    records_identified: {\n      by_database: data.records_identified_by_database,\n      total: parseInt(data.records_identified_total) || 0\n    },\n    duplicates_removed: parseInt(data.duplicates_removed) || 0,\n    records_after_deduplication: parseInt(data.total_documents_after_dedup) || 0\n  },\n  \n  // Screening section\n  screening: {\n    records_screened: parseInt(data.records_screened) || 0,\n    records_excluded: {\n      total: parseInt(data.records_excluded_screening) || 0,\n      by_reason: data.exclusion_reasons || []\n    },\n    records_not_screened: parseInt(data.records_not_yet_screened) || 0,\n    records_pending_review: parseInt(data.records_pending_review) || 0\n  },\n  \n  // Eligibility section (full-text - not yet implemented for alpha)\n  eligibility: {\n    reports_sought: 0,\n    reports_not_retrieved: 0,\n    reports_assessed: 0,\n    reports_excluded: 0,\n    status: 'not_started'\n  },\n  \n  // Included studies section\n  included: {\n    studies_included: parseInt(data.records_included) || 0,\n    reports_of_included: parseInt(data.records_included) || 0\n  },\n  \n  // Summary statistics\n  summary: {\n    screening_progress: data.records_screened > 0 && data.total_documents_after_dedup > 0\n      ? ((data.records_screened / data.total_documents_after_dedup) * 100).toFixed(1) + '%'\n      : '0%',\n    inclusion_rate: data.records_screened > 0\n      ? ((data.records_included / data.records_screened) * 100).toFixed(1) + '%'\n      : 'N/A',\n    exclusion_rate: data.records_screened > 0\n      ? ((data.records_excluded_screening / data.records_screened) * 100).toFixed(1) + '%'\n      : 'N/A'\n  }\n};\n\n// Human-readable text summary\nconst textSummary = `PRISMA 2020 Flow Summary\n========================\n\nIDENTIFICATION\n- Records identified from databases: ${prismaFlow.identification.records_identified.total}\n- Duplicates removed: ${prismaFlow.identification.duplicates_removed}\n- Records after deduplication: ${prismaFlow.identification.records_after_deduplication}\n\nSCREENING (Title/Abstract)\n- Records screened: ${prismaFlow.screening.records_screened}\n- Records excluded: ${prismaFlow.screening.records_excluded.total}\n- Records pending review: ${prismaFlow.screening.records_pending_review}\n- Records not yet screened: ${prismaFlow.screening.records_not_screened}\n\nELIGIBILITY (Full-text)\n- Status: Not yet started (alpha version)\n\nINCLUDED\n- Studies included: ${prismaFlow.included.studies_included}\n\nPROGRESS\n- Screening progress: ${prismaFlow.summary.screening_progress}\n- Inclusion rate: ${prismaFlow.summary.inclusion_rate}\n`;\n\nreturn [{\n  json: {\n    prisma_flow: prismaFlow,\n    text_summary: textSummary,\n    success: true\n  }\n}];"
+      },
+      "id": "format-prisma-output",
+      "name": "Format PRISMA Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-prisma-flow",
+      "name": "Respond PRISMA Flow",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "path": "slr-prisma-update",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-update",
+      "name": "Update PRISMA Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 550],
+      "webhookId": "slr-prisma-update-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Task 76: Upsert PRISMA flow data after screening completion\nWITH calculated_counts AS (\n  SELECT \n    $1::uuid as review_id,\n    COALESCE(\n      (SELECT jsonb_object_agg(database_name, results_count)\n       FROM search_executions WHERE review_id = $1::uuid),\n      '{}'::jsonb\n    ) as records_identified,\n    COALESCE(\n      (SELECT COUNT(*) FROM documents WHERE review_id = $1::uuid AND is_duplicate = TRUE),\n      0\n    ) as duplicates_removed,\n    COALESCE(\n      (SELECT COUNT(DISTINCT document_id) FROM screening_decisions \n       WHERE review_id = $1::uuid AND screening_stage = 'title_abstract'),\n      0\n    ) as records_screened,\n    COALESCE(\n      (SELECT COUNT(*) FROM screening_decisions \n       WHERE review_id = $1::uuid AND screening_stage = 'title_abstract' AND decision = 'exclude'),\n      0\n    ) as records_excluded_screening,\n    COALESCE(\n      (SELECT jsonb_agg(jsonb_build_object('reason', exclusion_reason, 'count', cnt))\n       FROM (\n         SELECT COALESCE(exclusion_reason, 'unspecified') as exclusion_reason, COUNT(*) as cnt\n         FROM screening_decisions\n         WHERE review_id = $1::uuid AND screening_stage = 'title_abstract' AND decision = 'exclude'\n         GROUP BY exclusion_reason\n       ) subq),\n      '[]'::jsonb\n    ) as exclusion_reasons,\n    COALESCE(\n      (SELECT COUNT(*) FROM screening_decisions \n       WHERE review_id = $1::uuid AND screening_stage = 'title_abstract' AND decision = 'include'),\n      0\n    ) as studies_included\n)\nINSERT INTO prisma_flow (\n  review_id,\n  flow_version,\n  records_identified,\n  duplicates_removed,\n  records_screened,\n  records_excluded_screening,\n  exclusion_reasons,\n  studies_included,\n  reports_of_included,\n  updated_at\n)\nSELECT \n  review_id,\n  COALESCE((SELECT MAX(flow_version) + 1 FROM prisma_flow WHERE prisma_flow.review_id = $1::uuid), 1),\n  records_identified,\n  duplicates_removed::integer,\n  records_screened::integer,\n  records_excluded_screening::integer,\n  exclusion_reasons,\n  studies_included::integer,\n  studies_included::integer,\n  NOW()\nFROM calculated_counts\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$json.body.review_id] }}"
+        }
+      },
+      "id": "upsert-prisma-flow",
+      "name": "Upsert PRISMA Flow",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 550],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO audit_log (review_id, event_type, event_data, created_at)\nVALUES (\n  $1::uuid,\n  'prisma_flow_updated',\n  $2::jsonb,\n  NOW()\n)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id, JSON.stringify({ flow_version: $json.flow_version, records_screened: $json.records_screened, records_excluded: $json.records_excluded_screening, studies_included: $json.studies_included })] }}"
+        }
+      },
+      "id": "audit-prisma-update",
+      "name": "Audit PRISMA Update",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [650, 550],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Generate PRISMA update response\n */\n\nconst prismaData = $('Upsert PRISMA Flow').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    review_id: prismaData.review_id,\n    flow_version: prismaData.flow_version,\n    message: `PRISMA flow updated to version ${prismaData.flow_version}`,\n    summary: {\n      records_identified: prismaData.records_identified,\n      duplicates_removed: prismaData.duplicates_removed,\n      records_screened: prismaData.records_screened,\n      records_excluded: prismaData.records_excluded_screening,\n      studies_included: prismaData.studies_included\n    },\n    updated_at: prismaData.updated_at\n  }\n}];"
+      },
+      "id": "generate-update-response",
+      "name": "Generate Update Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 550]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-prisma-update",
+      "name": "Respond PRISMA Update",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1050, 550]
+    },
+    {
+      "parameters": {
+        "path": "slr-prisma-history",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-history",
+      "name": "PRISMA History Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 800],
+      "webhookId": "slr-prisma-history-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Task 77: Query to retrieve current and historical PRISMA flow data\nSELECT \n  pf.id,\n  pf.review_id,\n  r.title as review_title,\n  pf.flow_version,\n  pf.records_identified,\n  pf.records_identified_total,\n  pf.duplicates_removed,\n  pf.records_screened,\n  pf.records_excluded_screening,\n  pf.exclusion_reasons,\n  pf.reports_sought,\n  pf.reports_not_retrieved,\n  pf.reports_assessed,\n  pf.reports_excluded,\n  pf.studies_included,\n  pf.reports_of_included,\n  pf.generated_at,\n  pf.updated_at\nFROM prisma_flow pf\nJOIN reviews r ON pf.review_id = r.id\nWHERE pf.review_id = $1::uuid\nORDER BY pf.flow_version DESC\nLIMIT 10;",
+        "options": {
+          "queryReplacement": "={{ [$json.query.review_id] }}"
+        }
+      },
+      "id": "query-prisma-history",
+      "name": "Query PRISMA History",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 800],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Format PRISMA history response\n */\n\nconst history = $input.all();\n\nif (history.length === 0 || !history[0].json.id) {\n  return [{\n    json: {\n      success: true,\n      review_id: $('PRISMA History Trigger').first().json.query.review_id,\n      message: 'No PRISMA flow history found for this review.',\n      versions: [],\n      current_version: null\n    }\n  }];\n}\n\nconst versions = history.map(h => ({\n  version: h.json.flow_version,\n  records_identified: h.json.records_identified_total,\n  duplicates_removed: h.json.duplicates_removed,\n  records_screened: h.json.records_screened,\n  records_excluded: h.json.records_excluded_screening,\n  studies_included: h.json.studies_included,\n  updated_at: h.json.updated_at\n}));\n\nconst current = history[0].json;\n\nreturn [{\n  json: {\n    success: true,\n    review_id: current.review_id,\n    review_title: current.review_title,\n    current_version: current.flow_version,\n    current_data: {\n      records_identified: current.records_identified,\n      records_identified_total: current.records_identified_total,\n      duplicates_removed: current.duplicates_removed,\n      records_screened: current.records_screened,\n      records_excluded_screening: current.records_excluded_screening,\n      exclusion_reasons: current.exclusion_reasons,\n      studies_included: current.studies_included\n    },\n    version_history: versions,\n    message: `Found ${versions.length} version(s) of PRISMA flow data.`\n  }\n}];"
+      },
+      "id": "format-history-response",
+      "name": "Format History Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 800]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-prisma-history",
+      "name": "Respond PRISMA History",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 800]
+    }
+  ],
+  "connections": {
+    "Get PRISMA Flow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Calculate PRISMA Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate PRISMA Counts": {
+      "main": [
+        [
+          {
+            "node": "Format PRISMA Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format PRISMA Output": {
+      "main": [
+        [
+          {
+            "node": "Respond PRISMA Flow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update PRISMA Trigger": {
+      "main": [
+        [
+          {
+            "node": "Upsert PRISMA Flow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert PRISMA Flow": {
+      "main": [
+        [
+          {
+            "node": "Audit PRISMA Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit PRISMA Update": {
+      "main": [
+        [
+          {
+            "node": "Generate Update Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Update Response": {
+      "main": [
+        [
+          {
+            "node": "Respond PRISMA Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PRISMA History Trigger": {
+      "main": [
+        [
+          {
+            "node": "Query PRISMA History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query PRISMA History": {
+      "main": [
+        [
+          {
+            "node": "Format History Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format History Response": {
+      "main": [
+        [
+          {
+            "node": "Respond PRISMA History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["slr", "prisma", "reporting"],
+  "triggerCount": 3,
+  "updatedAt": "2026-01-24T15:03:45.397Z",
+  "versionId": "1"
+}

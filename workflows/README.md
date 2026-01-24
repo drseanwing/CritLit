@@ -129,6 +129,37 @@ All parameters are optional - defaults are provided for quick testing.
 - Average confidence score
 - Average processing time
 
+### 6. slr_checkpoint_management.json
+**Purpose**: Manage workflow checkpoints for resume and recovery functionality.
+
+**Key Features**:
+- Query last checkpoint for any review
+- Resume workflow from saved checkpoint state
+- Validate checkpoint consistency with database
+- List all active checkpoints
+- Audit logging for checkpoint events
+
+**Endpoints**:
+- `POST /webhook/slr-resume-workflow` - Resume a paused/failed workflow
+- `POST /webhook/slr-checkpoint-validate` - Validate checkpoint consistency
+- `GET /webhook/slr-checkpoint-list` - List all active checkpoints
+
+### 7. slr_prisma_flow.json
+**Purpose**: Track and report PRISMA 2020 flow diagram data.
+
+**Key Features**:
+- Calculate all PRISMA flow counts from database
+- Records identified per database
+- Duplicates removed count
+- Records screened and excluded with reasons
+- Version-controlled PRISMA flow history
+- Human-readable formatted output
+
+**Endpoints**:
+- `GET /webhook/slr-prisma-flow?review_id=uuid` - Get current PRISMA counts
+- `POST /webhook/slr-prisma-update` - Update PRISMA flow data
+- `GET /webhook/slr-prisma-history?review_id=uuid` - Get version history
+
 ## Importing Workflows into n8n
 
 1. **Access n8n Web Interface**
@@ -255,7 +286,7 @@ curl -X POST http://localhost:5678/webhook/slr-test-pubmed-search \
 
 ## Alpha Version Status
 
-The current workflows implement Phase 1-4 functionality:
+The current workflows implement Phase 1-6 functionality:
 
 ✅ **Implemented (Phase 1-2)**:
 - Main coordinator workflow structure
@@ -285,7 +316,23 @@ The current workflows implement Phase 1-4 functionality:
 - Audit logging for all screening decisions
 - Statistics aggregation
 
-🚧 **Pending (Phase 5+)**:
+✅ **Implemented (Phase 5)**:
+- Checkpoint data structure schema
+- Resume logic for interrupted workflows
+- Checkpoint validation queries
+- Manual resume trigger webhook
+- Active checkpoint listing
+- Audit logging for checkpoint events
+
+✅ **Implemented (Phase 6)**:
+- PRISMA flow calculation queries
+- Records identified, duplicates, screened counts
+- Exclusion reasons tracking
+- Versioned PRISMA flow history
+- Human-readable PRISMA formatting
+- PRISMA update and history endpoints
+
+🚧 **Pending (Phase 7+)**:
 - Duplicate detection and deduplication
 - Full-text PDF retrieval
 - Data extraction workflows

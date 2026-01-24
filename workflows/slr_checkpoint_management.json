@@ -1,0 +1,479 @@
+{
+  "name": "SLR Checkpoint Management",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "slr-resume-workflow",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-resume",
+      "name": "Resume Workflow Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "slr-resume-workflow-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-resume-review-id",
+              "name": "review_id",
+              "value": "={{ $json.body.review_id }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-resume-workflow",
+              "name": "workflow_name",
+              "value": "={{ $json.body.workflow_name || null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-resume-params",
+      "name": "Extract Resume Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Task 65: Query last checkpoint for continuation\nSELECT \n  ws.id,\n  ws.review_id,\n  ws.execution_id,\n  ws.workflow_name,\n  ws.workflow_stage,\n  ws.checkpoint_data,\n  ws.items_processed,\n  ws.items_total,\n  ws.items_remaining,\n  ws.last_processed_id,\n  ws.error_count,\n  ws.error_details,\n  ws.status,\n  ws.created_at,\n  ws.updated_at,\n  r.title as review_title,\n  r.status as review_status\nFROM workflow_state ws\nJOIN reviews r ON ws.review_id = r.id\nWHERE ws.review_id = $1::uuid\n  AND ws.status IN ('in_progress', 'paused', 'failed')\n  AND ($2::text IS NULL OR ws.workflow_name = $2::text)\nORDER BY ws.updated_at DESC\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [$json.review_id, $json.workflow_name] }}"
+        }
+      },
+      "id": "query-last-checkpoint",
+      "name": "Query Last Checkpoint",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-checkpoint-exists",
+              "leftValue": "={{ $json.id !== undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-checkpoint-exists",
+      "name": "Check Checkpoint Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Task 63: Checkpoint data structure schema for workflow state serialization\n * Prepare resume context from saved checkpoint\n */\n\nconst checkpoint = $input.first().json;\n\n// Parse checkpoint_data if it's a string\nlet checkpointData = checkpoint.checkpoint_data;\nif (typeof checkpointData === 'string') {\n  try {\n    checkpointData = JSON.parse(checkpointData);\n  } catch (e) {\n    checkpointData = {};\n  }\n}\n\n// Build resume context\nconst resumeContext = {\n  checkpoint_id: checkpoint.id,\n  review_id: checkpoint.review_id,\n  review_title: checkpoint.review_title,\n  workflow_name: checkpoint.workflow_name,\n  workflow_stage: checkpoint.workflow_stage,\n  last_processed_id: checkpoint.last_processed_id,\n  items_processed: checkpoint.items_processed || 0,\n  items_total: checkpoint.items_total || 0,\n  items_remaining: checkpoint.items_remaining || 0,\n  error_count: checkpoint.error_count || 0,\n  previous_status: checkpoint.status,\n  checkpoint_data: checkpointData,\n  resume_initiated_at: new Date().toISOString()\n};\n\n// Determine which workflow to invoke based on workflow_stage\nlet targetWebhook = null;\nswitch (checkpoint.workflow_stage) {\n  case 'search_execution':\n  case 'searching':\n    targetWebhook = '/webhook/slr-search-execution';\n    break;\n  case 'screening_ta':\n  case 'screening':\n    targetWebhook = '/webhook/slr-screening-batch';\n    break;\n  case 'protocol_setup':\n  case 'protocol':\n    targetWebhook = '/webhook/slr-protocol-setup';\n    break;\n  default:\n    targetWebhook = '/webhook/slr-start';\n}\n\nreturn [{\n  json: {\n    ...resumeContext,\n    target_webhook: targetWebhook,\n    message: `Resume context prepared for ${checkpoint.workflow_name} at stage ${checkpoint.workflow_stage}`\n  }\n}];"
+      },
+      "id": "prepare-resume-context",
+      "name": "Prepare Resume Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Update checkpoint status to resuming\nUPDATE workflow_state\nSET \n  status = 'in_progress',\n  error_count = 0,\n  updated_at = NOW()\nWHERE id = $1::uuid\nRETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [$json.checkpoint_id] }}"
+        }
+      },
+      "id": "update-checkpoint-status",
+      "name": "Update Checkpoint Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1250, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Task 69: Audit logging for checkpoint resume events\nINSERT INTO audit_log (review_id, event_type, event_data, created_at)\nVALUES (\n  $1::uuid,\n  'checkpoint_resumed',\n  $2::jsonb,\n  NOW()\n)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare Resume Context').first().json.review_id, JSON.stringify({ checkpoint_id: $('Prepare Resume Context').first().json.checkpoint_id, workflow_name: $('Prepare Resume Context').first().json.workflow_name, workflow_stage: $('Prepare Resume Context').first().json.workflow_stage, items_processed: $('Prepare Resume Context').first().json.items_processed, items_remaining: $('Prepare Resume Context').first().json.items_remaining })] }}"
+        }
+      },
+      "id": "audit-checkpoint-resume",
+      "name": "Audit Checkpoint Resume",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1450, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Generate successful resume response\n */\n\nconst resumeContext = $('Prepare Resume Context').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    review_id: resumeContext.review_id,\n    review_title: resumeContext.review_title,\n    checkpoint_id: resumeContext.checkpoint_id,\n    workflow_name: resumeContext.workflow_name,\n    workflow_stage: resumeContext.workflow_stage,\n    items_processed: resumeContext.items_processed,\n    items_remaining: resumeContext.items_remaining,\n    last_processed_id: resumeContext.last_processed_id,\n    target_webhook: resumeContext.target_webhook,\n    message: `Checkpoint resume initiated. ${resumeContext.items_remaining} items remaining.`,\n    next_step: `To complete resume, call POST ${resumeContext.target_webhook} with the checkpoint data.`,\n    checkpoint_data: resumeContext.checkpoint_data\n  }\n}];"
+      },
+      "id": "generate-resume-response",
+      "name": "Generate Resume Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-resume-success",
+      "name": "Respond Resume Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Handle no checkpoint found\n */\n\nconst params = $('Extract Resume Parameters').first().json;\n\nreturn [{\n  json: {\n    success: false,\n    review_id: params.review_id,\n    error: 'No active checkpoint found',\n    message: `No resumable checkpoint found for review ${params.review_id}. The workflow may have completed successfully or no checkpoint was saved.`,\n    suggestion: 'Start a new workflow execution using the /webhook/slr-start endpoint.'\n  }\n}];"
+      },
+      "id": "handle-no-checkpoint",
+      "name": "Handle No Checkpoint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "respond-no-checkpoint",
+      "name": "Respond No Checkpoint",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "path": "slr-checkpoint-validate",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-validate",
+      "name": "Validate Checkpoint Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 600],
+      "webhookId": "slr-checkpoint-validate-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Task 67: Checkpoint validation query to verify state consistency\nWITH checkpoint_info AS (\n  SELECT \n    ws.id,\n    ws.review_id,\n    ws.workflow_name,\n    ws.workflow_stage,\n    ws.items_processed,\n    ws.items_total,\n    ws.last_processed_id,\n    ws.status\n  FROM workflow_state ws\n  WHERE ws.review_id = $1::uuid\n    AND ws.status IN ('in_progress', 'paused')\n  ORDER BY ws.updated_at DESC\n  LIMIT 1\n),\ndocument_counts AS (\n  SELECT \n    COUNT(*) as total_documents,\n    COUNT(*) FILTER (WHERE screening_status = 'pending') as pending_documents,\n    COUNT(*) FILTER (WHERE screening_status IN ('included', 'excluded', 'needs_review')) as processed_documents\n  FROM documents\n  WHERE review_id = $1::uuid\n),\nscreening_counts AS (\n  SELECT \n    COUNT(DISTINCT document_id) as screened_documents\n  FROM screening_decisions\n  WHERE review_id = $1::uuid\n    AND screening_stage = 'title_abstract'\n)\nSELECT \n  ci.*,\n  dc.total_documents,\n  dc.pending_documents,\n  dc.processed_documents,\n  sc.screened_documents,\n  CASE \n    WHEN ci.items_processed IS NULL THEN 'no_checkpoint'\n    WHEN ci.items_processed = sc.screened_documents THEN 'consistent'\n    WHEN ci.items_processed < sc.screened_documents THEN 'checkpoint_behind'\n    ELSE 'checkpoint_ahead'\n  END as consistency_status,\n  ABS(COALESCE(ci.items_processed, 0) - COALESCE(sc.screened_documents, 0)) as discrepancy_count\nFROM document_counts dc\nCROSS JOIN screening_counts sc\nLEFT JOIN checkpoint_info ci ON true;",
+        "options": {
+          "queryReplacement": "={{ [$json.body.review_id] }}"
+        }
+      },
+      "id": "validate-checkpoint-consistency",
+      "name": "Validate Checkpoint Consistency",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 600],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Generate validation results\n */\n\nconst result = $input.first().json;\n\nconst isValid = result.consistency_status === 'consistent' || result.consistency_status === 'no_checkpoint';\n\nreturn [{\n  json: {\n    review_id: result.review_id || $('Validate Checkpoint Trigger').first().json.body.review_id,\n    checkpoint_id: result.id,\n    workflow_name: result.workflow_name,\n    workflow_stage: result.workflow_stage,\n    is_valid: isValid,\n    consistency_status: result.consistency_status,\n    discrepancy_count: result.discrepancy_count || 0,\n    checkpoint_items_processed: result.items_processed,\n    actual_screened_documents: result.screened_documents,\n    total_documents: result.total_documents,\n    pending_documents: result.pending_documents,\n    message: isValid \n      ? 'Checkpoint state is consistent with database records.'\n      : `Checkpoint state is inconsistent: ${result.discrepancy_count} document(s) difference detected.`,\n    recommendation: isValid\n      ? 'Safe to resume workflow.'\n      : 'Consider resetting checkpoint or investigating discrepancy before resume.'\n  }\n}];"
+      },
+      "id": "generate-validation-response",
+      "name": "Generate Validation Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-validation",
+      "name": "Respond Validation",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 600]
+    },
+    {
+      "parameters": {
+        "path": "slr-checkpoint-list",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-list",
+      "name": "List Checkpoints Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 800],
+      "webhookId": "slr-checkpoint-list-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  ws.id,\n  ws.review_id,\n  r.title as review_title,\n  ws.workflow_name,\n  ws.workflow_stage,\n  ws.items_processed,\n  ws.items_total,\n  ws.items_remaining,\n  ws.error_count,\n  ws.status,\n  ws.created_at,\n  ws.updated_at\nFROM workflow_state ws\nJOIN reviews r ON ws.review_id = r.id\nWHERE ws.status IN ('in_progress', 'paused', 'failed')\nORDER BY ws.updated_at DESC\nLIMIT 50;",
+        "options": {}
+      },
+      "id": "list-active-checkpoints",
+      "name": "List Active Checkpoints",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 800],
+      "credentials": {
+        "postgres": {
+          "id": "postgres-slr-database",
+          "name": "SLR PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Format checkpoint list response\n */\n\nconst checkpoints = $input.all();\n\nconst formattedCheckpoints = checkpoints.map(cp => ({\n  id: cp.json.id,\n  review_id: cp.json.review_id,\n  review_title: cp.json.review_title,\n  workflow: cp.json.workflow_name,\n  stage: cp.json.workflow_stage,\n  progress: `${cp.json.items_processed || 0} / ${cp.json.items_total || '?'}`,\n  remaining: cp.json.items_remaining,\n  errors: cp.json.error_count,\n  status: cp.json.status,\n  last_updated: cp.json.updated_at\n}));\n\nreturn [{\n  json: {\n    total_checkpoints: formattedCheckpoints.length,\n    checkpoints: formattedCheckpoints,\n    message: formattedCheckpoints.length > 0 \n      ? `Found ${formattedCheckpoints.length} active checkpoint(s).`\n      : 'No active checkpoints found.'\n  }\n}];"
+      },
+      "id": "format-checkpoint-list",
+      "name": "Format Checkpoint List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 800]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "respond-checkpoint-list",
+      "name": "Respond Checkpoint List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 800]
+    }
+  ],
+  "connections": {
+    "Resume Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Resume Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Resume Parameters": {
+      "main": [
+        [
+          {
+            "node": "Query Last Checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Last Checkpoint": {
+      "main": [
+        [
+          {
+            "node": "Check Checkpoint Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Checkpoint Exists": {
+      "main": [
+        [
+          {
+            "node": "Prepare Resume Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle No Checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle No Checkpoint": {
+      "main": [
+        [
+          {
+            "node": "Respond No Checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Resume Context": {
+      "main": [
+        [
+          {
+            "node": "Update Checkpoint Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Checkpoint Status": {
+      "main": [
+        [
+          {
+            "node": "Audit Checkpoint Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Checkpoint Resume": {
+      "main": [
+        [
+          {
+            "node": "Generate Resume Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Resume Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Resume Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Checkpoint Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Checkpoint Consistency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Checkpoint Consistency": {
+      "main": [
+        [
+          {
+            "node": "Generate Validation Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Validation Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Checkpoints Trigger": {
+      "main": [
+        [
+          {
+            "node": "List Active Checkpoints",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Active Checkpoints": {
+      "main": [
+        [
+          {
+            "node": "Format Checkpoint List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Checkpoint List": {
+      "main": [
+        [
+          {
+            "node": "Respond Checkpoint List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["slr", "checkpoint", "resume"],
+  "triggerCount": 3,
+  "updatedAt": "2026-01-24T15:03:45.397Z",
+  "versionId": "1"
+}
