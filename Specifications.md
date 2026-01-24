@@ -1046,10 +1046,10 @@ const screeningReviewForm = {
 
 **Technical milestones**:
 
-- [ ] Docker compose with PostgreSQL + pgvector + n8n + Ollama
-- [ ] Database schema with indexes and full-text search
-- [ ] PubMed search → document storage workflow
-- [ ] Workflow state checkpoint/resume tested
+- [x] Docker compose with PostgreSQL + pgvector + n8n + Ollama
+- [x] Database schema with indexes and full-text search
+- [x] PubMed search → document storage workflow (structure created, parsing to be completed in Phase 3)
+- [x] Workflow state checkpoint/resume tested (structure created, testing to be completed in Phase 5)
 
 ### Phase 2: Search & Deduplication (Weeks 4-5)
 

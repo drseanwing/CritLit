@@ -146,8 +146,11 @@ docker compose exec postgres psql -U slr_user -d slr_database -c "\dx"
 
 1. Access n8n at http://localhost:5678
 2. Login with credentials from `.env` file
-3. Import workflow templates from `workflows/` directory (when available)
-4. Test workflows with sample PICO criteria
+3. Import workflow templates from `workflows/` directory
+4. Configure credentials for PostgreSQL and Ollama
+5. Test workflows with sample PICO criteria
+
+See [workflows/README.md](workflows/README.md) for detailed workflow documentation.
 
 ## 📖 Core Concepts
 
@@ -200,8 +203,9 @@ ORDER BY updated_at DESC LIMIT 1;
 
 ## 🧪 Alpha Test Status
 
-### ✅ Completed (Phase 1: Infrastructure Foundation)
+### ✅ Completed
 
+**Phase 1: Infrastructure Foundation (tasks 1-28)**
 - [x] Docker Compose configuration with all services
 - [x] PostgreSQL with performance tuning
 - [x] n8n with queue mode enabled
@@ -218,11 +222,17 @@ ORDER BY updated_at DESC LIMIT 1;
 - [x] Verification scripts for all services
 - [x] Deployment documentation
 
-### 🚧 In Progress (Phase 2-10)
+**Phase 2: Basic n8n Workflows (tasks 29-38)**
+- [x] Main coordinator workflow with state management
+- [x] Protocol setup workflow for PICO criteria
+- [x] Search execution workflow for PubMed integration
+- [x] Screening batch workflow with Ollama LLM
+- [x] Workflow documentation and testing guide
+
+### 🚧 In Progress (Phase 3-10)
 
 See [ALPHA_TEST_TASKS.md](ALPHA_TEST_TASKS.md) for complete task list:
 
-- Phase 2: Basic n8n Workflows (tasks 29-38)
 - Phase 3: PubMed Integration (tasks 39-48)
 - Phase 4: Screening Agent Implementation (tasks 49-62)
 - Phase 5: Checkpoint and Resume (tasks 63-71)
@@ -256,6 +266,6 @@ Built following the "Ralph Playbook" pattern for multi-agent orchestration with 
 
 ---
 
-**Version**: Alpha 0.1  
+**Version**: Alpha 0.2  
 **Last Updated**: 2026-01-24  
-**Status**: Phase 1 Complete, Phase 2 In Progress
+**Status**: Phase 1 & 2 Complete, Phase 3 In Progress
