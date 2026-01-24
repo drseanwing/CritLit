@@ -98,7 +98,7 @@ CREATE INDEX idx_documents_review_status ON documents(review_id, screening_statu
 CREATE INDEX idx_documents_external_id ON documents(external_id);
 
 -- Vector columns for semantic search
-embedding vector(384),  -- Dimension matches your embedding model
+embedding vector(384),  -- Dimension matches all-MiniLM-L6-v2 model (384d)
 CREATE INDEX idx_embeddings_vector ON document_embeddings USING hnsw (embedding vector_cosine_ops);
 ```
 
@@ -603,7 +603,7 @@ CREATE TABLE screening_decisions (
 
 1. **Start Services**: `docker-compose up -d`
 2. **Check Logs**: `docker-compose logs -f postgres n8n`
-3. **Run Migrations**: `docker-compose exec postgres psql -U slr_user -d slr_database -f /docker-entrypoint-initdb.d/001_create_tables.sql`
+3. **Run Migrations**: Apply SQL migrations from `migrations/` directory via init scripts or psql
 4. **Pull Ollama Model**: `docker-compose exec ollama ollama pull llama3.1:70b`
 5. **Stop Services**: `docker-compose down` (or `docker-compose down -v` to delete volumes)
 
@@ -719,6 +719,6 @@ async def reconcile_disagreements(
 
 ---
 
-*Last Updated*: 2026-01-24  
+*Last Updated*: 2024-01-24  
 *Version*: 1.0  
 *Maintained By*: CritLit Development Team
