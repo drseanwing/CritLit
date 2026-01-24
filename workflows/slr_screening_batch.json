@@ -28,13 +28,13 @@
             {
               "id": "extract-batch-size",
               "name": "batch_size",
-              "value": "={{ $json.body.batch_size || parseInt($env.SCREENING_BATCH_SIZE) || 50 }}",
+              "value": "={{ $json.body.batch_size || (parseInt($env.SCREENING_BATCH_SIZE || '50') || 50) }}",
               "type": "number"
             },
             {
               "id": "extract-confidence-threshold",
               "name": "confidence_threshold",
-              "value": "={{ $json.body.confidence_threshold || parseFloat($env.SCREENING_CONFIDENCE_THRESHOLD) || 0.85 }}",
+              "value": "={{ $json.body.confidence_threshold || (parseFloat($env.SCREENING_CONFIDENCE_THRESHOLD || '0.85') || 0.85) }}",
               "type": "number"
             }
           ]
