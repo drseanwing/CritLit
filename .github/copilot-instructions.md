@@ -269,6 +269,15 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+-- Create updated_at trigger function (reusable across tables)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
 -- Create reviews table
 CREATE TABLE IF NOT EXISTS reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
