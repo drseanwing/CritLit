@@ -442,7 +442,8 @@ async def db_pool():
     
     # Run migrations
     async with pool.acquire() as conn:
-        await conn.execute(open("migrations/001_create_reviews_table.sql").read())
+        with open("migrations/001_create_reviews_table.sql") as f:
+            await conn.execute(f.read())
     
     yield pool
     
