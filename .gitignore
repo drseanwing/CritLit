@@ -1,30 +1,3 @@
-<<<<<<< HEAD
-# Environment secrets
-.env
-*.env
-!.env.example
-
-# Docker volumes and data directories
-docker-data/
-volumes/
-data/
-
-# PostgreSQL data
-postgres-data/
-pgdata/
-postgresql/
-
-# n8n data files
-n8n-data/
-.n8n/
-
-# Ollama model files
-ollama-data/
-ollama-models/
-.ollama/
-
-# Node modules
-=======
 # CritLit Systematic Literature Review Pipeline - Git Ignore Configuration
 
 # =============================================================================
@@ -105,83 +78,10 @@ venv.bak/
 # =============================================================================
 # NODE.JS / N8N
 # =============================================================================
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-<<<<<<< HEAD
-package-lock.json
-yarn.lock
-
-# Python virtual environments
-venv/
-env/
-ENV/
-.venv/
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-pip-log.txt
-pip-delete-this-directory.txt
-
-# IDE/Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.project
-.classpath
-.settings/
-*.sublime-project
-*.sublime-workspace
-
-# OS files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# Log files
-*.log
-logs/
-*.log.*
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.bak
-*.cache
-.temp/
-
-# Build outputs
-dist/
-build/
-*.egg-info/
-
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-
-# Pytest
-.pytest_cache/
-
-# MyPy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-=======
 lerna-debug.log*
 .pnpm-debug.log*
 
@@ -203,7 +103,6 @@ ilibrarian_data/
 *.sqlite
 *.db
 *.dump
-*.bak
 
 # Exclude actual database files (keep migration scripts)
 !migrations/*.sql
@@ -214,9 +113,6 @@ ilibrarian_data/
 # =============================================================================
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # =============================================================================
 # TEMPORARY FILES
@@ -232,7 +128,6 @@ test_data/
 scratch/
 
 # Editor temporary files
-*~
 *.swp
 *.swo
 *.bak
@@ -254,11 +149,11 @@ scratch/
 *.sublime-workspace
 
 # Emacs
-*~
 \#*\#
 /.emacs.desktop
 /.emacs.desktop.lock
 *.elc
+*~
 
 # Vim
 [._]*.s[a-v][a-z]
@@ -347,7 +242,6 @@ prisma_diagrams/
 *.dll
 *.exe
 *.o
-*.so
 
 # Archives
 *.7z
@@ -367,4 +261,3 @@ prisma_diagrams/
 
 # N8N backup files
 backup_*.json
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
