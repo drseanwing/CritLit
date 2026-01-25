@@ -1,0 +1,140 @@
+{
+  "name": "SLR_Protocol_Setup",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1f5e4d3c-2a1b-4c8d-9e0f-1a2b3c4d5e6f",
+      "name": "Execute_Workflow_Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  r.id,\n  r.title,\n  r.status,\n  r.pico,\n  r.inclusion_criteria,\n  r.exclusion_criteria,\n  r.search_strategy,\n  r.protocol_version\nFROM reviews r\nWHERE r.id = $1::uuid",
+        "options": {}
+      },
+      "id": "2a6b5c7d-3b2c-4d9e-0f1a-2b3c4d5e6f7a",
+      "name": "Load_Review_Config",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [470, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_slr",
+          "name": "PostgreSQL SLR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Node: Protocol_Validation\n * Purpose: Validate PICO criteria completeness for protocol setup\n * Input: Review configuration from PostgreSQL\n * Output: Validation status with completeness assessment\n */\n\n// Validate input\nconst input = $input.first();\nif (!input?.json) {\n  throw new Error('Missing input data from Load_Review_Config');\n}\n\nconst { id, title, status, pico, inclusion_criteria, exclusion_criteria, search_strategy, protocol_version } = input.json;\n\n// PICO completeness validation\nconst validation = {\n  review_id: id,\n  title: title,\n  status: status,\n  protocol_version: protocol_version,\n  validation_timestamp: new Date().toISOString(),\n  pico_complete: false,\n  validation_errors: [],\n  validation_warnings: [],\n  can_proceed: false\n};\n\n// Check PICO structure\nif (!pico || typeof pico !== 'object') {\n  validation.validation_errors.push('PICO criteria is missing or invalid');\n} else {\n  // Validate Population\n  if (!pico.population || pico.population.trim() === '') {\n    validation.validation_errors.push('Population (P) is not defined');\n  }\n  \n  // Validate Intervention\n  if (!pico.intervention || pico.intervention.trim() === '') {\n    validation.validation_errors.push('Intervention (I) is not defined');\n  }\n  \n  // Validate Comparator\n  if (!pico.comparator || pico.comparator.trim() === '') {\n    validation.validation_warnings.push('Comparator (C) is not defined - acceptable for some review types');\n  }\n  \n  // Validate Outcomes\n  if (!pico.outcomes || !Array.isArray(pico.outcomes) || pico.outcomes.length === 0) {\n    validation.validation_errors.push('Outcomes (O) array is empty or invalid');\n  } else if (pico.outcomes.some(outcome => !outcome || outcome.trim() === '')) {\n    validation.validation_errors.push('One or more outcomes are empty');\n  }\n  \n  // Validate Study Types\n  if (!pico.study_types || !Array.isArray(pico.study_types) || pico.study_types.length === 0) {\n    validation.validation_warnings.push('Study types are not specified');\n  }\n}\n\n// Check inclusion criteria\nif (!inclusion_criteria || (typeof inclusion_criteria === 'object' && Object.keys(inclusion_criteria).length === 0)) {\n  validation.validation_errors.push('Inclusion criteria are not defined');\n}\n\n// Check exclusion criteria\nif (!exclusion_criteria || (typeof exclusion_criteria === 'object' && Object.keys(exclusion_criteria).length === 0)) {\n  validation.validation_warnings.push('Exclusion criteria are not defined - recommended for screening');\n}\n\n// Check search strategy\nif (!search_strategy || search_strategy.trim() === '') {\n  validation.validation_warnings.push('Search strategy is not defined');\n}\n\n// Determine overall status\nvalidation.pico_complete = validation.validation_errors.length === 0;\nvalidation.can_proceed = validation.pico_complete;\n\nif (validation.pico_complete) {\n  validation.message = 'Protocol validation passed. PICO criteria are complete.';\n  validation.next_stage = 'search_execution';\n} else {\n  validation.message = `Protocol validation failed. ${validation.validation_errors.length} error(s) found.`;\n  validation.next_stage = 'protocol_refinement';\n}\n\nreturn [{\n  json: validation\n}];"
+      },
+      "id": "3b7c6d8e-4c3d-5e0f-1a2b-3c4d5e6f7a8b",
+      "name": "Protocol_Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "validation_status",
+              "value": "={{ $json.pico_complete ? 'PASS' : 'FAIL' }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "review_id",
+              "value": "={{ $json.review_id }}"
+            },
+            {
+              "name": "next_stage",
+              "value": "={{ $json.next_stage }}"
+            },
+            {
+              "name": "error_count",
+              "value": "={{ $json.validation_errors.length }}"
+            },
+            {
+              "name": "warning_count",
+              "value": "={{ $json.validation_warnings.length }}"
+            }
+          ],
+          "boolean": [
+            {
+              "name": "can_proceed",
+              "value": "={{ $json.can_proceed }}"
+            }
+          ],
+          "array": [
+            {
+              "name": "errors",
+              "value": "={{ $json.validation_errors }}"
+            },
+            {
+              "name": "warnings",
+              "value": "={{ $json.validation_warnings }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4c8d7e9f-5d4e-6f1a-2b3c-4d5e6f7a8b9c",
+      "name": "Return_Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [910, 300]
+    }
+  ],
+  "connections": {
+    "Execute_Workflow_Trigger": {
+      "main": [
+        [
+          {
+            "node": "Load_Review_Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load_Review_Config": {
+      "main": [
+        [
+          {
+            "node": "Protocol_Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Protocol_Validation": {
+      "main": [
+        [
+          {
+            "node": "Return_Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-25T00:00:00.000Z",
+  "versionId": "1",
+  "active": false
+}
