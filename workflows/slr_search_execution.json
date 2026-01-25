@@ -1,47 +1,4 @@
 {
-<<<<<<< HEAD
-  "name": "SLR_Search_Execution",
-  "nodes": [
-    {
-      "parameters": {},
-      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "name": "Execute_Workflow_Trigger",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1,
-      "position": [
-        240,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT sq.id, sq.search_strategy_id, sq.database_id, sq.query_text, sq.parameters\nFROM search_queries sq\nWHERE sq.id = $1",
-        "options": {
-          "queryReplacement": "={{ $json.search_query_id }}"
-        }
-      },
-      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-      "name": "Load_Search_Config",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [
-        460,
-        300
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "1",
-          "name": "PostgreSQL account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-        "authentication": "none",
-=======
   "name": "SLR Search Execution",
   "nodes": [
     {
@@ -101,7 +58,6 @@
         "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpQueryAuth",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -111,19 +67,11 @@
             },
             {
               "name": "term",
-<<<<<<< HEAD
-              "value": "={{ $json.query_text }}"
-            },
-            {
-              "name": "retmax",
-              "value": "={{ $json.parameters?.retmax || 100 }}"
-=======
               "value": "={{ $json.search_query }}"
             },
             {
               "name": "retmax",
               "value": "={{ $json.max_results }}"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             },
             {
               "name": "retmode",
@@ -135,55 +83,16 @@
             },
             {
               "name": "api_key",
-<<<<<<< HEAD
-              "value": "={{ $env.PUBMED_API_KEY || '' }}"
-            },
-            {
-              "name": "tool",
-              "value": "critlit_slr"
-            },
-            {
-              "name": "email",
-              "value": "={{ $env.CONTACT_EMAIL || '' }}"
-=======
               "value": "={{ $env.PUBMED_API_KEY }}"
             },
             {
               "name": "email",
               "value": "={{ $env.CONTACT_EMAIL }}"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             }
           ]
         },
         "options": {}
       },
-<<<<<<< HEAD
-      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-      "name": "PubMed_ESearch",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        680,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const searchResult = $input.first().json;\nconst config = $('Load_Search_Config').first().json;\n\nconst esearchresult = searchResult.esearchresult || {};\nconst idlist = esearchresult.idlist || [];\nconst count = parseInt(esearchresult.count || '0', 10);\nconst querykey = esearchresult.querykey || '';\nconst webenv = esearchresult.webenv || '';\n\nreturn {\n  json: {\n    search_query_id: config.id,\n    pmids: idlist,\n    total_count: count,\n    querykey: querykey,\n    webenv: webenv,\n    database_id: config.database_id,\n    search_strategy_id: config.search_strategy_id\n  }\n};"
-      },
-      "id": "d4e5f6a7-b8c9-0123-def1-234567890123",
-      "name": "Parse_Search_Results",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        900,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-=======
       "id": "pubmed-esearch-node",
       "name": "PubMed ESearch",
       "type": "n8n-nodes-base.httpRequest",
@@ -254,7 +163,6 @@
     },
     {
       "parameters": {
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
         "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
         "authentication": "none",
         "sendQuery": true,
@@ -266,19 +174,11 @@
             },
             {
               "name": "query_key",
-<<<<<<< HEAD
-              "value": "={{ $json.querykey }}"
-            },
-            {
-              "name": "WebEnv",
-              "value": "={{ $json.webenv }}"
-=======
               "value": "={{ $('PubMed ESearch').item.json.esearchresult.querykey }}"
             },
             {
               "name": "WebEnv",
               "value": "={{ $('PubMed ESearch').item.json.esearchresult.webenv }}"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             },
             {
               "name": "retmode",
@@ -286,21 +186,6 @@
             },
             {
               "name": "retmax",
-<<<<<<< HEAD
-              "value": "={{ $json.total_count }}"
-            },
-            {
-              "name": "api_key",
-              "value": "={{ $env.PUBMED_API_KEY || '' }}"
-            },
-            {
-              "name": "tool",
-              "value": "critlit_slr"
-            },
-            {
-              "name": "email",
-              "value": "={{ $env.CONTACT_EMAIL || '' }}"
-=======
               "value": "={{ $('Extract Search Parameters').item.json.max_results }}"
             },
             {
@@ -310,117 +195,11 @@
             {
               "name": "email",
               "value": "={{ $env.CONTACT_EMAIL }}"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             }
           ]
         },
         "options": {}
       },
-<<<<<<< HEAD
-      "id": "e5f6a7b8-c9d0-1234-ef12-345678901234",
-      "name": "PubMed_EFetch",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1120,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const xml = $input.first().binary?.data?.toString('utf-8') || $input.first().json;\nconst searchData = $('Parse_Search_Results').first().json;\n\n// Simple XML parsing for PubMed articles\nconst extractTag = (xml, tag) => {\n  const regex = new RegExp(`<${tag}[^>]*>([\\\\s\\\\S]*?)</${tag}>`, 'gi');\n  const matches = [];\n  let match;\n  while ((match = regex.exec(xml)) !== null) {\n    matches.push(match[1]);\n  }\n  return matches;\n};\n\nconst extractSingleTag = (xml, tag) => {\n  const regex = new RegExp(`<${tag}[^>]*>([\\\\s\\\\S]*?)</${tag}>`, 'i');\n  const match = xml.match(regex);\n  return match ? match[1].trim() : null;\n};\n\nconst articles = extractTag(xml, 'PubmedArticle');\nconst documents = [];\n\nfor (const article of articles) {\n  const pmid = extractSingleTag(article, 'PMID');\n  const articleTitle = extractSingleTag(article, 'ArticleTitle');\n  const abstractText = extractSingleTag(article, 'AbstractText') || '';\n  const journalTitle = extractSingleTag(article, 'Title');\n  \n  // Extract year\n  const pubDate = extractSingleTag(article, 'PubDate');\n  const year = pubDate ? extractSingleTag(pubDate, 'Year') : null;\n  \n  // Extract authors\n  const authorList = extractSingleTag(article, 'AuthorList');\n  const authors = authorList ? extractTag(authorList, 'Author').map(auth => {\n    const lastName = extractSingleTag(auth, 'LastName') || '';\n    const foreName = extractSingleTag(auth, 'ForeName') || '';\n    return `${foreName} ${lastName}`.trim();\n  }) : [];\n  \n  documents.push({\n    external_id: pmid,\n    database_id: searchData.database_id,\n    title: articleTitle,\n    abstract: abstractText,\n    authors: authors,\n    publication_year: year ? parseInt(year, 10) : null,\n    journal: journalTitle,\n    metadata: {\n      source: 'PubMed',\n      search_query_id: searchData.search_query_id\n    }\n  });\n}\n\nreturn documents.map(doc => ({ json: doc }));"
-      },
-      "id": "f6a7b8c9-d0e1-2345-f123-456789012345",
-      "name": "Parse_Documents",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1340,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "insert",
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public"
-        },
-        "table": {
-          "__rl": true,
-          "mode": "list",
-          "value": "documents"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "external_id": "={{ $json.external_id }}",
-            "database_id": "={{ $json.database_id }}",
-            "title": "={{ $json.title }}",
-            "abstract": "={{ $json.abstract }}",
-            "authors": "={{ JSON.stringify($json.authors) }}",
-            "publication_year": "={{ $json.publication_year }}",
-            "journal": "={{ $json.journal }}",
-            "metadata": "={{ JSON.stringify($json.metadata) }}"
-          }
-        },
-        "options": {
-          "skipOnConflict": true
-        }
-      },
-      "id": "a7b8c9d0-e1f2-3456-1234-567890123456",
-      "name": "Save_Documents",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [
-        1560,
-        300
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "1",
-          "name": "PostgreSQL account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "insert",
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public"
-        },
-        "table": {
-          "__rl": true,
-          "mode": "list",
-          "value": "search_executions"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "search_query_id": "={{ $('Parse_Search_Results').first().json.search_query_id }}",
-            "executed_at": "={{ new Date().toISOString() }}",
-            "results_count": "={{ $('Parse_Search_Results').first().json.total_count }}",
-            "status": "completed"
-          }
-        },
-        "options": {}
-      },
-      "id": "b8c9d0e1-f2a3-4567-2345-678901234567",
-      "name": "Log_Search_Execution",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [
-        1560,
-        480
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "1",
-          "name": "PostgreSQL account"
-=======
       "id": "pubmed-efetch-node",
       "name": "PubMed EFetch",
       "type": "n8n-nodes-base.httpRequest",
@@ -463,29 +242,11 @@
         "postgres": {
           "id": "postgres-slr-database",
           "name": "SLR PostgreSQL"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
         }
       }
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "values": {
-          "string": [
-            {
-              "name": "status",
-              "value": "success"
-            }
-          ],
-          "number": [
-            {
-              "name": "total_results",
-              "value": "={{ $('Parse_Search_Results').first().json.total_count }}"
-            },
-            {
-              "name": "documents_saved",
-              "value": "={{ $('Save_Documents').itemMatching(0).length || 0 }}"
-=======
         "assignments": {
           "assignments": [
             {
@@ -499,30 +260,11 @@
               "name": "event_data",
               "value": "={{ { \"search_execution_id\": $json.id, \"database_name\": $json.database_name, \"results_count\": $json.results_count } }}",
               "type": "object"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             }
           ]
         },
         "options": {}
       },
-<<<<<<< HEAD
-      "id": "c9d0e1f2-a3b4-5678-3456-789012345678",
-      "name": "Return_Results",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [
-        1780,
-        300
-      ]
-    }
-  ],
-  "connections": {
-    "Execute_Workflow_Trigger": {
-      "main": [
-        [
-          {
-            "node": "Load_Search_Config",
-=======
       "id": "prepare-audit-data",
       "name": "Prepare Audit Data",
       "type": "n8n-nodes-base.set",
@@ -536,58 +278,34 @@
         [
           {
             "node": "Extract Search Parameters",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Load_Search_Config": {
-      "main": [
-        [
-          {
-            "node": "PubMed_ESearch",
-=======
     "Extract Search Parameters": {
       "main": [
         [
           {
             "node": "PubMed ESearch",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "PubMed_ESearch": {
-      "main": [
-        [
-          {
-            "node": "Parse_Search_Results",
-=======
     "PubMed ESearch": {
       "main": [
         [
           {
             "node": "Prepare Search Log",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Parse_Search_Results": {
-      "main": [
-        [
-          {
-            "node": "PubMed_EFetch",
-=======
     "Prepare Search Log": {
       "main": [
         [
@@ -604,73 +322,44 @@
         [
           {
             "node": "Prepare Audit Data",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           },
           {
-<<<<<<< HEAD
-            "node": "Log_Search_Execution",
-=======
             "node": "PubMed EFetch",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "PubMed_EFetch": {
-      "main": [
-        [
-          {
-            "node": "Parse_Documents",
-=======
     "Prepare Audit Data": {
       "main": [
         [
           {
             "node": "Audit Search Execution",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Parse_Documents": {
-      "main": [
-        [
-          {
-            "node": "Save_Documents",
-=======
     "PubMed EFetch": {
       "main": [
         [
           {
             "node": "Parse PubMed XML",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Save_Documents": {
-      "main": [
-        [
-          {
-            "node": "Return_Results",
-=======
     "Parse PubMed XML": {
       "main": [
         [
           {
             "node": "Respond Search Complete",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
@@ -684,14 +373,7 @@
   },
   "staticData": null,
   "tags": [],
-<<<<<<< HEAD
-  "triggerCount": 0,
-  "updatedAt": "2026-01-25T00:00:00.000Z",
-  "versionId": "1",
-  "active": false
-=======
   "triggerCount": 1,
   "updatedAt": "2026-01-24T14:17:58.607Z",
   "versionId": "1"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
 }

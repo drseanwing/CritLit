@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
-  "name": "SLR_Main_Coordinator",
-=======
   "name": "SLR Main Coordinator",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
   "nodes": [
     {
       "parameters": {
@@ -13,70 +9,32 @@
         "options": {}
       },
       "id": "webhook-trigger-node",
-<<<<<<< HEAD
-      "name": "Webhook_Trigger",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-=======
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "position": [250, 300],
       "webhookId": "slr-coordinator-webhook"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-<<<<<<< HEAD
-        "query": "SELECT ws.*, r.title, r.pico, r.inclusion_criteria, r.exclusion_criteria, r.status\nFROM workflow_state ws\nJOIN reviews r ON ws.review_id = r.id\nWHERE ws.execution_id = $1\nORDER BY ws.updated_at DESC\nLIMIT 1",
-        "options": {
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "execution_id",
-                "value": "={{ $json.execution_id }}"
-              }
-            ]
-          }
-        }
-      },
-      "id": "load-review-state-node",
-      "name": "Load_Review_State",
-=======
         "query": "SELECT r.*, ws.workflow_stage, ws.checkpoint_data, ws.items_processed, ws.items_total, ws.updated_at as checkpoint_updated_at\nFROM reviews r\nLEFT JOIN workflow_state ws ON r.id = ws.review_id\nWHERE r.id = $1::uuid\nORDER BY ws.updated_at DESC\nLIMIT 1;",
         "options": {}
       },
       "id": "load-review-state-node",
       "name": "Load Review State",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [450, 300],
       "credentials": {
         "postgres": {
-<<<<<<< HEAD
-          "id": "slr_postgres_credentials",
-=======
           "id": "postgres-slr-database",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
           "name": "SLR PostgreSQL"
         }
       }
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "promptType": "define",
-        "text": "={{ $json.user_request || 'Continue SLR workflow' }}",
-        "hasOutputParser": true,
-        "options": {
-          "systemMessage": "You are the SLR Coordinator Agent for an autonomous systematic literature review pipeline.\n\nYour role is to:\n1. Analyze the current review state and workflow stage\n2. Determine the next appropriate action based on:\n   - Current workflow_stage from the database\n   - Review status (protocol, searching, screening, extraction, synthesis, complete)\n   - Items processed vs items_total\n   - User's request or instruction\n3. Route to the appropriate workflow stage:\n   - protocol_setup: Initialize new review with PICO criteria\n   - search_execution: Execute database searches (PubMed, etc.)\n   - deduplication: Identify and merge duplicate records\n   - title_abstract_screening: AI-assisted screening of titles/abstracts\n   - full_text_screening: Full-text review and eligibility assessment\n   - data_extraction: Extract study characteristics and outcomes\n   - quality_assessment: Risk of bias and GRADE assessment\n   - synthesis: Meta-analysis or narrative synthesis\n   - reporting: Generate PRISMA flow and final report\n\nCurrent state:\nReview ID: {{ $json.review_id }}\nReview Title: {{ $json.title }}\nReview Status: {{ $json.status }}\nWorkflow Stage: {{ $json.workflow_stage }}\nItems Processed: {{ $json.items_processed }}/{{ $json.items_total }}\nLast Checkpoint: {{ $json.updated_at }}\n\nRespond with JSON containing:\n{\n  \"next_stage\": \"<stage_name>\",\n  \"reasoning\": \"<why this stage is next>\",\n  \"parameters\": {\n    \"review_id\": \"<uuid>\",\n    \"execution_id\": \"<execution_id>\",\n    \"batch_size\": <number>,\n    \"resume_from\": \"<last_processed_id or null>\"\n  }\n}"
-        }
-      },
-      "id": "coordinator-agent-node",
-      "name": "Coordinator_Agent",
-=======
         "assignments": {
           "assignments": [
             {
@@ -103,7 +61,6 @@
       },
       "id": "coordinator-agent-node",
       "name": "Coordinator Agent",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.6,
       "position": [650, 300]
@@ -113,159 +70,6 @@
         "rules": {
           "rules": [
             {
-<<<<<<< HEAD
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "protocol_setup",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "protocol_setup"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "search_execution",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "search_execution"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "deduplication",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "deduplication"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "title_abstract_screening",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "screening"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "full_text_screening",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "full_text"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "data_extraction",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "extraction"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "quality_assessment",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "quality"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "synthesis",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "synthesis"
-            },
-            {
-              "conditions": {
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.next_stage }}",
-                    "rightValue": "reporting",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "reporting"
-            }
-          ]
-        },
-        "options": {
-          "fallbackOutput": "extra"
-        }
-      },
-      "id": "stage-router-node",
-      "name": "Stage_Router",
-=======
               "id": "route-to-protocol",
               "operation": "equals",
               "value1": "={{ $json.next_stage }}",
@@ -306,64 +110,12 @@
       },
       "id": "stage-router-node",
       "name": "Stage Router",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
       "position": [850, 300]
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "operation": "executeQuery",
-        "query": "INSERT INTO workflow_state (\n  review_id,\n  execution_id,\n  workflow_stage,\n  checkpoint_data,\n  items_processed,\n  items_total,\n  last_processed_id,\n  error_count\n)\nVALUES (\n  $1, $2, $3, $4, $5, $6, $7, $8\n)\nON CONFLICT (execution_id)\nDO UPDATE SET\n  workflow_stage = EXCLUDED.workflow_stage,\n  checkpoint_data = EXCLUDED.checkpoint_data,\n  items_processed = EXCLUDED.items_processed,\n  items_total = EXCLUDED.items_total,\n  last_processed_id = EXCLUDED.last_processed_id,\n  error_count = EXCLUDED.error_count,\n  updated_at = NOW()\nRETURNING *",
-        "options": {
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "review_id",
-                "value": "={{ $json.parameters.review_id }}"
-              },
-              {
-                "name": "execution_id",
-                "value": "={{ $json.parameters.execution_id }}"
-              },
-              {
-                "name": "workflow_stage",
-                "value": "={{ $json.next_stage }}"
-              },
-              {
-                "name": "checkpoint_data",
-                "value": "={{ JSON.stringify($json.parameters) }}"
-              },
-              {
-                "name": "items_processed",
-                "value": "={{ $json.parameters.items_processed || 0 }}"
-              },
-              {
-                "name": "items_total",
-                "value": "={{ $json.parameters.items_total || 0 }}"
-              },
-              {
-                "name": "last_processed_id",
-                "value": "={{ $json.parameters.resume_from || null }}"
-              },
-              {
-                "name": "error_count",
-                "value": "={{ $json.parameters.error_count || 0 }}"
-              }
-            ]
-          }
-        }
-      },
-      "id": "save-checkpoint-node",
-      "name": "Save_Checkpoint",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [1050, 300],
-      "credentials": {
-        "postgres": {
-          "id": "slr_postgres_credentials",
-=======
         "workflowId": "={{ $env.PROTOCOL_WORKFLOW_ID }}",
         "options": {
           "waitForSubWorkflow": true
@@ -474,32 +226,12 @@
       "credentials": {
         "postgres": {
           "id": "postgres-slr-database",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
           "name": "SLR PostgreSQL"
         }
       }
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "respondWith": "json",
-        "responseBody": "={{ {\n  \"status\": \"routed\",\n  \"next_stage\": $json.next_stage,\n  \"reasoning\": $json.reasoning,\n  \"checkpoint_saved\": true,\n  \"execution_id\": $json.parameters.execution_id,\n  \"message\": \"Workflow routed to \" + $json.next_stage + \" stage\"\n} }}",
-        "options": {}
-      },
-      "id": "response-node",
-      "name": "Response",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [1250, 300]
-    }
-  ],
-  "connections": {
-    "Webhook_Trigger": {
-      "main": [
-        [
-          {
-            "node": "Load_Review_State",
-=======
         "assignments": {
           "assignments": [
             {
@@ -561,140 +293,45 @@
         [
           {
             "node": "Extract Review ID",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Load_Review_State": {
-      "main": [
-        [
-          {
-            "node": "Coordinator_Agent",
-=======
     "Extract Review ID": {
       "main": [
         [
           {
             "node": "Load Review State",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Coordinator_Agent": {
-      "main": [
-        [
-          {
-            "node": "Stage_Router",
-=======
     "Load Review State": {
       "main": [
         [
           {
             "node": "Coordinator Agent",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Stage_Router": {
-      "main": [
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Save_Checkpoint",
-=======
     "Coordinator Agent": {
       "main": [
         [
           {
             "node": "Stage Router",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Save_Checkpoint": {
-      "main": [
-        [
-          {
-            "node": "Response",
-=======
     "Stage Router": {
       "main": [
         [
@@ -783,7 +420,6 @@
         [
           {
             "node": "Save Checkpoint",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
@@ -793,24 +429,6 @@
   },
   "pinData": {},
   "settings": {
-<<<<<<< HEAD
-    "executionOrder": "v1",
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": ""
-  },
-  "staticData": null,
-  "tags": [
-    {
-      "id": "slr-workflows",
-      "name": "SLR Workflows"
-    }
-  ],
-  "triggerCount": 1,
-  "updatedAt": "2026-01-25T00:00:00.000Z",
-  "versionId": "1.0.0",
-  "active": false
-=======
     "executionOrder": "v1"
   },
   "staticData": null,
@@ -818,5 +436,4 @@
   "triggerCount": 1,
   "updatedAt": "2026-01-24T14:17:58.607Z",
   "versionId": "1"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
 }

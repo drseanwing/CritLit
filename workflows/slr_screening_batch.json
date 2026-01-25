@@ -1,71 +1,22 @@
 {
-<<<<<<< HEAD
-  "name": "SLR_Screening_Batch",
-  "nodes": [
-    {
-      "parameters": {
-        "path": "screening-batch",
-=======
   "name": "SLR Screening Batch",
   "nodes": [
     {
       "parameters": {
         "path": "slr-screening-batch",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
         "httpMethod": "POST",
         "responseMode": "responseNode",
         "options": {}
       },
-<<<<<<< HEAD
-      "id": "execute-workflow-trigger-node",
-      "name": "Execute_Workflow_Trigger",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-=======
       "id": "webhook-trigger-screening",
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "position": [250, 300],
       "webhookId": "slr-screening-batch-webhook"
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "operation": "executeQuery",
-        "query": "SELECT d.id, d.review_id, d.title, d.abstract, d.authors, d.publication_year, d.journal, d.doi\nFROM documents d\nLEFT JOIN screening_decisions sd ON d.id = sd.document_id\nWHERE d.review_id = $1\n  AND sd.id IS NULL\n  AND d.id > COALESCE($2, '00000000-0000-0000-0000-000000000000'::uuid)\nORDER BY d.id\nLIMIT $3",
-        "options": {
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "review_id",
-                "value": "={{ $json.review_id }}"
-              },
-              {
-                "name": "last_processed_id",
-                "value": "={{ $json.last_processed_id || '00000000-0000-0000-0000-000000000000' }}"
-              },
-              {
-                "name": "batch_size",
-                "value": "={{ $json.batch_size || 100 }}"
-              }
-            ]
-          }
-        }
-      },
-      "id": "fetch-unscreened-batch-node",
-      "name": "Fetch_Unscreened_Batch",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [450, 300],
-      "credentials": {
-        "postgres": {
-          "id": "postgres_slr",
-          "name": "PostgreSQL SLR"
-        }
-      }
-=======
         "assignments": {
           "assignments": [
             {
@@ -89,210 +40,27 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.3,
       "position": [450, 300]
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
     },
     {
       "parameters": {
         "operation": "executeQuery",
-<<<<<<< HEAD
-        "query": "SELECT id, title, pico, inclusion_criteria, exclusion_criteria\nFROM reviews\nWHERE id = $1",
-        "options": {
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "review_id",
-                "value": "={{ $json.review_id }}"
-              }
-            ]
-          }
-        }
-      },
-      "id": "load-review-config-node",
-      "name": "Load_Review_Config",
-=======
         "query": "SELECT r.id as review_id, r.pico, r.inclusion_criteria, r.exclusion_criteria\nFROM reviews r\nWHERE r.id = $1::uuid\nLIMIT 1;",
         "options": {}
       },
       "id": "load-review-criteria",
       "name": "Load Review Criteria",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [650, 300],
       "credentials": {
         "postgres": {
-<<<<<<< HEAD
-          "id": "postgres_slr",
-          "name": "PostgreSQL SLR"
-=======
           "id": "postgres-slr-database",
           "name": "SLR PostgreSQL"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
         }
       }
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "batchSize": 10,
-        "options": {}
-      },
-      "id": "split-into-batches-node",
-      "name": "Split_Into_Batches",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [850, 300]
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const reviewConfig = $input.first().json;\nconst document = $input.item.json;\n\nconst prompt = `You are an AI assistant performing title/abstract screening for a systematic literature review.\n\nReview Title: ${reviewConfig.title}\n\nPICO Framework:\n${JSON.stringify(reviewConfig.pico, null, 2)}\n\nInclusion Criteria:\n${reviewConfig.inclusion_criteria}\n\nExclusion Criteria:\n${reviewConfig.exclusion_criteria}\n\nDocument to Screen:\nTitle: ${document.title}\nAbstract: ${document.abstract}\nAuthors: ${document.authors}\nJournal: ${document.journal}\nYear: ${document.publication_year}\nDOI: ${document.doi}\n\nBased on the title and abstract, determine if this document should be:\n- INCLUDE: Meets inclusion criteria, proceed to full-text screening\n- EXCLUDE: Does not meet criteria\n- UNCERTAIN: Unclear, needs human review\n\nProvide your response in JSON format:\n{\n  \"decision\": \"INCLUDE|EXCLUDE|UNCERTAIN\",\n  \"reasoning\": \"Brief explanation of your decision\",\n  \"confidence\": 0.0-1.0,\n  \"relevant_criteria\": [\"criterion1\", \"criterion2\"]\n}`;\n\nreturn {\n  prompt,\n  document_id: document.id,\n  review_id: document.review_id\n};"
-      },
-      "id": "build-screening-prompt-node",
-      "name": "Build_Screening_Prompt",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1050, 300]
-    },
-    {
-      "parameters": {
-        "model": "llama3.1:latest",
-        "options": {
-          "temperature": 0.1,
-          "maxTokens": 1000,
-          "topP": 0.95
-        },
-        "prompt": "={{ $json.prompt }}"
-      },
-      "id": "ai-screening-node",
-      "name": "AI_Screening_Node",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
-      "typeVersion": 1,
-      "position": [1250, 300]
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const aiResponse = $input.item.json.response || $input.item.json.text || JSON.stringify($input.item.json);\nconst document_id = $input.item.json.document_id;\nconst review_id = $input.item.json.review_id;\n\nlet parsed;\ntry {\n  // Try to parse JSON response\n  const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsed = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found in response');\n  }\n} catch (error) {\n  // Fallback: simple heuristic parsing\n  const decision = aiResponse.toLowerCase().includes('include') ? 'INCLUDE' :\n                   aiResponse.toLowerCase().includes('exclude') ? 'EXCLUDE' : 'UNCERTAIN';\n  parsed = {\n    decision,\n    reasoning: aiResponse.substring(0, 500),\n    confidence: 0.5,\n    relevant_criteria: []\n  };\n}\n\nreturn {\n  document_id,\n  review_id,\n  decision: parsed.decision,\n  reasoning: parsed.reasoning,\n  confidence: parsed.confidence,\n  relevant_criteria: JSON.stringify(parsed.relevant_criteria || []),\n  ai_model: 'llama3.1:latest',\n  screening_stage: 'title_abstract'\n};"
-      },
-      "id": "parse-screening-results-node",
-      "name": "Parse_Screening_Results",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1450, 300]
-    },
-    {
-      "parameters": {
-        "operation": "insert",
-        "schema": {
-          "schema": [
-            {
-              "column": "document_id",
-              "type": "uuid"
-            },
-            {
-              "column": "review_id",
-              "type": "uuid"
-            },
-            {
-              "column": "screening_stage",
-              "type": "text"
-            },
-            {
-              "column": "decision",
-              "type": "text"
-            },
-            {
-              "column": "reasoning",
-              "type": "text"
-            },
-            {
-              "column": "confidence",
-              "type": "numeric"
-            },
-            {
-              "column": "relevant_criteria",
-              "type": "jsonb"
-            },
-            {
-              "column": "screened_by",
-              "type": "text"
-            },
-            {
-              "column": "ai_model",
-              "type": "text"
-            }
-          ]
-        },
-        "table": "screening_decisions",
-        "columns": "document_id,review_id,screening_stage,decision,reasoning,confidence,relevant_criteria,screened_by,ai_model",
-        "options": {}
-      },
-      "id": "save-screening-decisions-node",
-      "name": "Save_Screening_Decisions",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
-      "position": [1650, 300],
-      "credentials": {
-        "postgres": {
-          "id": "postgres_slr",
-          "name": "PostgreSQL SLR"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "amount": 2,
-        "unit": "seconds"
-      },
-      "id": "rate-limit-wait-node",
-      "name": "Rate_Limit_Wait",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
-      "position": [1850, 300]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO workflow_state (\n  review_id,\n  execution_id,\n  workflow_stage,\n  checkpoint_data,\n  items_processed,\n  items_total,\n  last_processed_id,\n  error_count\n)\nVALUES (\n  $1, $2, 'title_abstract_screening', $3, $4, $5, $6, $7\n)\nON CONFLICT (execution_id)\nDO UPDATE SET\n  checkpoint_data = EXCLUDED.checkpoint_data,\n  items_processed = EXCLUDED.items_processed,\n  last_processed_id = EXCLUDED.last_processed_id,\n  error_count = EXCLUDED.error_count,\n  updated_at = NOW()\nRETURNING *",
-        "options": {
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "review_id",
-                "value": "={{ $json.review_id }}"
-              },
-              {
-                "name": "execution_id",
-                "value": "={{ $('Execute_Workflow_Trigger').item.json.execution_id }}"
-              },
-              {
-                "name": "checkpoint_data",
-                "value": "={{ JSON.stringify({ batch_completed: $runIndex, timestamp: new Date().toISOString() }) }}"
-              },
-              {
-                "name": "items_processed",
-                "value": "={{ $runIndex * 10 }}"
-              },
-              {
-                "name": "items_total",
-                "value": "={{ $('Fetch_Unscreened_Batch').item.json.total_count || 0 }}"
-              },
-              {
-                "name": "last_processed_id",
-                "value": "={{ $json.document_id }}"
-              },
-              {
-                "name": "error_count",
-                "value": "0"
-              }
-            ]
-          }
-        }
-      },
-      "id": "update-checkpoint-node",
-      "name": "Update_Checkpoint",
-=======
         "operation": "executeQuery",
         "query": "SELECT d.id, d.title, d.abstract, d.external_id, d.publication_year, d.authors\nFROM documents d\nLEFT JOIN screening_decisions sd ON d.id = sd.document_id\nWHERE d.review_id = $1::uuid\n  AND sd.id IS NULL\n  AND d.screening_status = 'pending'\nORDER BY d.created_at ASC\nLIMIT $2::integer;",
         "options": {}
@@ -413,51 +181,18 @@
       },
       "id": "update-document-status",
       "name": "Update Document Status",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [2050, 300],
       "credentials": {
         "postgres": {
-<<<<<<< HEAD
-          "id": "postgres_slr",
-          "name": "PostgreSQL SLR"
-=======
           "id": "postgres-slr-database",
           "name": "SLR PostgreSQL"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
         }
       }
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "values": {
-          "string": [
-            {
-              "name": "status",
-              "value": "batch_completed"
-            },
-            {
-              "name": "stage",
-              "value": "title_abstract_screening"
-            }
-          ],
-          "number": [
-            {
-              "name": "items_processed",
-              "value": "={{ $runIndex * 10 }}"
-            },
-            {
-              "name": "batch_number",
-              "value": "={{ $runIndex }}"
-            }
-          ],
-          "boolean": [
-            {
-              "name": "has_more_batches",
-              "value": "={{ $('Split_Into_Batches').context.noItemsLeft === false }}"
-=======
         "assignments": {
           "assignments": [
             {
@@ -471,16 +206,11 @@
               "name": "decision",
               "value": "={{ $('Parse Screening Decision').item.json.decision }}",
               "type": "string"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             }
           ]
         },
         "options": {}
       },
-<<<<<<< HEAD
-      "id": "return-batch-status-node",
-      "name": "Return_Batch_Status",
-=======
       "id": "prepare-update-params",
       "name": "Prepare Update Parameters",
       "type": "n8n-nodes-base.set",
@@ -515,23 +245,12 @@
       },
       "id": "aggregate-results",
       "name": "Aggregate Results",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.3,
       "position": [2250, 300]
     },
     {
       "parameters": {
-<<<<<<< HEAD
-        "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {}
-      },
-      "id": "response-node",
-      "name": "Response",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-=======
         "respondWith": "allIncomingItems",
         "options": {}
       },
@@ -539,113 +258,65 @@
       "name": "Respond Screening Complete",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
       "position": [2450, 300]
     }
   ],
   "connections": {
-<<<<<<< HEAD
-    "Execute_Workflow_Trigger": {
-      "main": [
-        [
-          {
-            "node": "Fetch_Unscreened_Batch",
-=======
     "Webhook Trigger": {
       "main": [
         [
           {
             "node": "Extract Screening Parameters",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Fetch_Unscreened_Batch": {
-      "main": [
-        [
-          {
-            "node": "Load_Review_Config",
-=======
     "Extract Screening Parameters": {
       "main": [
         [
           {
             "node": "Load Review Criteria",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Load_Review_Config": {
-      "main": [
-        [
-          {
-            "node": "Split_Into_Batches",
-=======
     "Load Review Criteria": {
       "main": [
         [
           {
             "node": "Prepare Fetch Parameters",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Split_Into_Batches": {
-      "main": [
-        [
-          {
-            "node": "Build_Screening_Prompt",
-=======
     "Prepare Fetch Parameters": {
       "main": [
         [
           {
             "node": "Fetch Unscreened Documents",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Build_Screening_Prompt": {
-      "main": [
-        [
-          {
-            "node": "AI_Screening_Node",
-=======
     "Fetch Unscreened Documents": {
       "main": [
         [
           {
             "node": "Split In Batches",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "AI_Screening_Node": {
-      "main": [
-        [
-          {
-            "node": "Parse_Screening_Results",
-=======
     "Split In Batches": {
       "main": [
         [
@@ -658,116 +329,67 @@
         [
           {
             "node": "Aggregate Results",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Parse_Screening_Results": {
-      "main": [
-        [
-          {
-            "node": "Save_Screening_Decisions",
-=======
     "Prepare Screening Prompt": {
       "main": [
         [
           {
             "node": "Ollama Screening Agent",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Save_Screening_Decisions": {
-      "main": [
-        [
-          {
-            "node": "Rate_Limit_Wait",
-=======
     "Ollama Screening Agent": {
       "main": [
         [
           {
             "node": "Parse Screening Decision",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Rate_Limit_Wait": {
-      "main": [
-        [
-          {
-            "node": "Update_Checkpoint",
-=======
     "Parse Screening Decision": {
       "main": [
         [
           {
             "node": "Save Screening Decision",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Update_Checkpoint": {
-      "main": [
-        [
-          {
-            "node": "Split_Into_Batches",
-=======
     "Save Screening Decision": {
       "main": [
         [
           {
             "node": "Prepare Update Parameters",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Split_Into_Batches": {
-      "main": [
-        null,
-        [
-          {
-            "node": "Return_Batch_Status",
-=======
     "Prepare Update Parameters": {
       "main": [
         [
           {
             "node": "Update Document Status",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-<<<<<<< HEAD
-    "Return_Batch_Status": {
-      "main": [
-        [
-          {
-            "node": "Response",
-=======
     "Update Document Status": {
       "main": [
         [
@@ -784,7 +406,6 @@
         [
           {
             "node": "Respond Screening Complete",
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
             "type": "main",
             "index": 0
           }
@@ -794,24 +415,6 @@
   },
   "pinData": {},
   "settings": {
-<<<<<<< HEAD
-    "executionOrder": "v1",
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": ""
-  },
-  "staticData": null,
-  "tags": [
-    {
-      "id": "slr-workflows",
-      "name": "SLR Workflows"
-    }
-  ],
-  "triggerCount": 1,
-  "updatedAt": "2026-01-25T00:00:00.000Z",
-  "versionId": "1.0.0",
-  "active": false
-=======
     "executionOrder": "v1"
   },
   "staticData": null,
@@ -819,5 +422,4 @@
   "triggerCount": 1,
   "updatedAt": "2026-01-24T14:17:58.607Z",
   "versionId": "1"
->>>>>>> 8ec46662c0b4dc47c2c0894f5f415b1c16b9190a
 }
