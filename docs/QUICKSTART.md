@@ -35,7 +35,7 @@ Before you begin, ensure you have:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/CritLit.git
+git clone https://github.com/drseanwing/CritLit.git
 cd CritLit
 ```
 
@@ -584,7 +584,7 @@ docker compose exec ollama nvidia-smi
 
 ## Getting Help
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/yourusername/CritLit/issues)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/drseanwing/CritLit/issues)
 - **Documentation**: Check `/docs` directory for detailed guides
 - **Logs**: Always check `docker compose logs <service>` for error details
 - **Community**: [Link to community forum/Discord if available]

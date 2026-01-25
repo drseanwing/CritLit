@@ -1267,7 +1267,7 @@ If issues persist after troubleshooting:
    docker exec slr_postgres pg_dump -U slr_user -d slr_database --schema-only > schema_dump.sql
    ```
 
-2. **Check GitHub Issues**: https://github.com/yourusername/CritLit/issues
+2. **Check GitHub Issues**: https://github.com/drseanwing/CritLit/issues
 
 3. **Open a new issue** with:
    - CritLit version (check README.md)
