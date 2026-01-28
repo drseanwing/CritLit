@@ -74,6 +74,24 @@ services:
       - n8n
       - redis
 
+  # n8n-mcp: MCP (Model Context Protocol) server for n8n integration
+  # Enables Claude and other AI assistants to interact with n8n workflows via stdio protocol
+  # Connect via Docker exec or configure in Claude settings (no HTTP ports needed)
+  n8n-mcp:
+    image: ghcr.io/czlonkowski/n8n-mcp:latest
+    container_name: slr_n8n_mcp
+    environment:
+      - MCP_MODE=stdio
+      - LOG_LEVEL=error
+      - DISABLE_CONSOLE_OUTPUT=true
+      - N8N_API_URL=http://n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+      - WEBHOOK_SECURITY_MODE=moderate
+    depends_on:
+      - n8n
+    # Note: No ports exposed - MCP uses stdio protocol
+    # Connect via Docker exec or configure in Claude settings
+
   redis:
     image: redis:7-alpine
     container_name: slr_redis

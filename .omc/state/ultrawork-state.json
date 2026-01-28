@@ -1,0 +1,7 @@
+{
+  "active": true,
+  "started_at": "2026-01-28T15:24:36.667Z",
+  "original_prompt": "There is a significant issue with the TypeScript build due to pre-existing type incompatibility from the merge—snake_case types vs camelCase agent code. Requires separate refactoring effort (~13k LOC in agent subdirectories).\n\nralph ulw\n\nAtomically commit and merge autonomously where possible. \nOn completion run a full code review. Remove orphaned branches.",
+  "reinforcement_count": 2,
+  "last_checked_at": "2026-01-28T16:13:05.158Z"
+}
