@@ -12,7 +12,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      - "7360:5432"
     command:
       - postgres
       - -c
@@ -49,7 +49,7 @@ services:
       - n8n_data:/home/node/.n8n
       - ./workflows:/workflows
     ports:
-      - "5678:5678"
+      - "7361:5678"
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,14 +86,15 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "11434:11434"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      - "7362:11434"
+    # NVIDIA GPU support commented out for testing server compatibility
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
   i-librarian:
     image: cgrima/i-librarian
@@ -101,7 +102,7 @@ services:
     volumes:
       - ilibrarian_data:/app/data
     ports:
-      - "8080:80"
+      - "7363:80"
     environment:
       - ILIBRARIAN_UPLOAD_MAX_SIZE=100M
 

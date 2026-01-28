@@ -158,7 +158,7 @@ test_services_healthy() {
 
   # Check n8n
   echo -n "  Checking n8n... "
-  if check_service "n8n" "http://localhost:5678" "401"; then
+  if check_service "n8n" "http://localhost:7361" "401"; then
     echo -e "${GREEN}✓${NC}"
   else
     echo -e "${RED}✗${NC}"
@@ -167,7 +167,7 @@ test_services_healthy() {
 
   # Check Ollama (optional)
   echo -n "  Checking Ollama... "
-  if check_service "ollama" "http://localhost:11434/api/tags" "200"; then
+  if check_service "ollama" "http://localhost:7362/api/tags" "200"; then
     echo -e "${GREEN}✓${NC}"
   else
     echo -e "${YELLOW}⊘ (optional)${NC}"
@@ -175,7 +175,7 @@ test_services_healthy() {
 
   # Check i-Librarian (optional)
   echo -n "  Checking i-Librarian... "
-  if check_service "i-librarian" "http://localhost:8080" "200" || check_service "i-librarian" "http://localhost:8080" "302"; then
+  if check_service "i-librarian" "http://localhost:7363" "200" || check_service "i-librarian" "http://localhost:7363" "302"; then
     echo -e "${GREEN}✓${NC}"
   else
     echo -e "${YELLOW}⊘ (optional)${NC}"
