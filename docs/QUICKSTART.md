@@ -449,6 +449,58 @@ docker compose logs n8n
 docker compose restart n8n
 ```
 
+### n8n Encryption Key Mismatch
+
+**Problem:** n8n container keeps restarting with error:
+```
+Error: Mismatching encryption keys. The encryption key in the settings file 
+/home/node/.n8n/config does not match the N8N_ENCRYPTION_KEY env var.
+```
+
+**Why This Happens:**
+When n8n starts for the first time, it stores the encryption key in its config file (inside the Docker volume). If you later change `N8N_ENCRYPTION_KEY` in your `.env` file—or start with a new `.env` but an existing n8n volume—the keys won't match.
+
+**Solution 1: Use the Original Encryption Key (Recommended if you have stored credentials)**
+
+If you still have access to the original encryption key, update your `.env` file to use it:
+```bash
+# Check the encryption key stored in n8n's config
+docker run --rm -v critlit_n8n_data:/data alpine cat /data/config 2>/dev/null | grep encryptionKey
+
+# Update N8N_ENCRYPTION_KEY in .env to match the key from the config file
+nano .env
+
+# Restart n8n
+docker compose restart n8n
+```
+
+**Solution 2: Reset n8n Data (Use if you don't need existing credentials/workflows)**
+
+If you don't need to preserve stored credentials and workflows in n8n:
+```bash
+# Stop all services
+docker compose down
+
+# Remove the n8n data volume (WARNING: This deletes all n8n workflows and credentials)
+docker volume rm critlit_n8n_data
+
+# Start services again - n8n will use the key from .env
+docker compose up -d
+```
+
+**Solution 3: Use the Helper Script**
+
+A helper script is provided to diagnose and resolve this issue:
+```bash
+# Run the troubleshooting script
+bash scripts/fix-n8n-encryption.sh
+```
+
+**Prevention:**
+- **Never change** `N8N_ENCRYPTION_KEY` after initial setup
+- **Back up** your encryption key securely (e.g., password manager)
+- If using version control for `.env` files, store the encryption key separately
+
 ### PostgreSQL Connection Failed
 
 **Problem:** n8n workflows can't connect to database
