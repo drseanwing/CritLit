@@ -161,7 +161,7 @@ ELAPSED=0
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
   # Check if n8n is responding (ignore auth)
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5678 2>/dev/null || echo "000")
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:7361 2>/dev/null || echo "000")
 
   # 401 (Unauthorized) means n8n is up but requires auth - that's success
   if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "200" ]; then
@@ -192,7 +192,7 @@ ELAPSED=0
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
   # Ollama API returns 200 for /api/tags endpoint
-  if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+  if curl -s http://localhost:7362/api/tags > /dev/null 2>&1; then
     echo -e "${GREEN}✓${NC} Ollama is responding"
     break
   fi
@@ -219,7 +219,7 @@ MAX_WAIT=30
 ELAPSED=0
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null || echo "000")
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:7363 2>/dev/null || echo "000")
 
   if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
     echo -e "${GREEN}✓${NC} i-Librarian is responding"
@@ -259,10 +259,10 @@ echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║${NC}  ${BLUE}Services Running${NC}                                             ${GREEN}║${NC}"
 echo -e "${GREEN}╠════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}PostgreSQL (pgvector)${NC}     http://localhost:5432              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}n8n Workflow Automation${NC}   http://localhost:5678              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}i-Librarian${NC}               http://localhost:8080              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}Ollama (LLM)${NC}              http://localhost:11434             ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${CYAN}PostgreSQL (pgvector)${NC}     http://localhost:7360              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${CYAN}n8n Workflow Automation${NC}   http://localhost:7361              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${CYAN}i-Librarian${NC}               http://localhost:7363              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${CYAN}Ollama (LLM)${NC}              http://localhost:7362              ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}  ${CYAN}Redis${NC}                     (internal only)                    ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""

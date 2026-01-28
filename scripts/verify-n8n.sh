@@ -34,10 +34,10 @@ print_info() {
 
 # 1. Check n8n web interface
 echo "1. Checking n8n web interface..."
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:5678 | grep -q "200\|401"; then
-    print_success "n8n web interface is accessible at http://localhost:5678"
+if curl -s -o /dev/null -w "%{http_code}" http://localhost:7361 | grep -q "200\|401"; then
+    print_success "n8n web interface is accessible at http://localhost:7361"
 else
-    print_failure "n8n web interface is not accessible at http://localhost:5678"
+    print_failure "n8n web interface is not accessible at http://localhost:7361"
 fi
 echo ""
 
@@ -101,8 +101,8 @@ if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}All checks passed!${NC}"
     echo ""
     echo "Service URLs:"
-    echo "  - n8n UI: http://localhost:5678"
-    echo "  - PostgreSQL: localhost:5432"
+    echo "  - n8n UI: http://localhost:7361"
+    echo "  - PostgreSQL: localhost:7360"
     echo "  - Redis: localhost:6379 (internal)"
     exit 0
 else
