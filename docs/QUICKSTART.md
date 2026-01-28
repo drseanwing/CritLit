@@ -465,7 +465,7 @@ When n8n starts for the first time, it stores the encryption key in its config f
 If you still have access to the original encryption key, update your `.env` file to use it:
 ```bash
 # Check the encryption key stored in n8n's config
-docker run --rm -v critlit_n8n_data:/data alpine cat /data/config 2>/dev/null | grep encryptionKey
+docker run --rm -v critlit_n8n_data:/data alpine cat /data/config 2>/dev/null | grep -o '"encryptionKey":"[^"]*"' | cut -d'"' -f4
 
 # Update N8N_ENCRYPTION_KEY in .env to match the key from the config file
 nano .env

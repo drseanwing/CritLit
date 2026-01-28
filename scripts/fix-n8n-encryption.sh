@@ -15,6 +15,19 @@ NC='\033[0m' # No Color
 # This should match the directory name or docker-compose project name
 PROJECT_PREFIX=${COMPOSE_PROJECT_NAME:-critlit}
 
+# Initialize ENV_KEY to avoid undefined variable issues
+ENV_KEY=""
+STORED_KEY=""
+
+# Cross-platform sed -i (macOS vs Linux)
+sed_inplace() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 print_header() {
     echo ""
     echo "========================================"
@@ -76,8 +89,18 @@ fi
 print_header "Step 2: Checking n8n Data Volume"
 
 # Find the volume name (could be critlit_n8n_data or slr_n8n_data depending on project name)
+# Build unique list of prefixes to check
+declare -a PREFIXES=()
+for prefix in "critlit" "slr"; do
+    PREFIXES+=("$prefix")
+done
+# Add PROJECT_PREFIX only if it's different from the hardcoded values
+if [[ "$PROJECT_PREFIX" != "critlit" ]] && [[ "$PROJECT_PREFIX" != "slr" ]]; then
+    PREFIXES+=("$PROJECT_PREFIX")
+fi
+
 VOLUME_NAME=""
-for prefix in "critlit" "slr" "${PROJECT_PREFIX}"; do
+for prefix in "${PREFIXES[@]}"; do
     if docker volume ls -q | grep -q "^${prefix}_n8n_data$"; then
         VOLUME_NAME="${prefix}_n8n_data"
         break
@@ -99,7 +122,7 @@ print_success "Found n8n data volume: $VOLUME_NAME"
 print_header "Step 3: Checking Stored Encryption Key"
 
 # Extract the key from the config file in the volume
-STORED_KEY=$(docker run --rm -v ${VOLUME_NAME}:/data alpine cat /data/config 2>/dev/null | grep -o '"encryptionKey":"[^"]*"' | cut -d'"' -f4 || echo "")
+STORED_KEY=$(docker run --rm -v "${VOLUME_NAME}:/data" alpine cat /data/config 2>/dev/null | grep -o '"encryptionKey":"[^"]*"' | cut -d'"' -f4 || echo "")
 
 if [ -z "$STORED_KEY" ]; then
     print_info "No encryption key found in n8n config (volume may be empty or config not created yet)"
@@ -107,8 +130,8 @@ else
     print_success "Found stored encryption key in n8n config"
     print_info "Stored key (first 8 chars): ${STORED_KEY:0:8}..."
     
-    # Compare keys
-    if [ "$ENV_KEY" = "$STORED_KEY" ]; then
+    # Compare keys (only if ENV_KEY is set)
+    if [ -n "$ENV_KEY" ] && [ "$ENV_KEY" = "$STORED_KEY" ]; then
         print_success "Keys match! There should be no encryption key error."
         print_info "If you're still seeing errors, try restarting the containers:"
         echo "  docker compose restart n8n n8n-worker"
@@ -130,11 +153,12 @@ echo -e "${GREEN}Option 1:${NC} Update .env to use the stored key (preserves cre
 echo "   This is recommended if you have stored workflows and credentials in n8n."
 echo ""
 if [ -n "$STORED_KEY" ]; then
-    echo "   The stored key is:"
-    echo -e "   ${BLUE}$STORED_KEY${NC}"
+    print_warning "The stored key will be displayed. Avoid sharing this on screen."
     echo ""
-    echo "   Update your .env file:"
-    echo "   sed -i 's|^N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=$STORED_KEY|' .env"
+    echo "   To view and copy the stored key, run:"
+    echo "   docker run --rm -v \"${VOLUME_NAME}:/data\" alpine cat /data/config | grep -o '\"encryptionKey\":\"[^\"]*\"' | cut -d'\"' -f4"
+    echo ""
+    echo "   Then update N8N_ENCRYPTION_KEY in your .env file with the key value."
     echo ""
 fi
 
@@ -143,7 +167,7 @@ echo "   This is recommended for new installations or if you don't need existing
 echo ""
 echo "   Commands to reset:"
 echo "   docker compose down"
-echo "   docker volume rm $VOLUME_NAME"
+echo "   docker volume rm \"$VOLUME_NAME\""
 echo "   docker compose up -d"
 echo ""
 
@@ -166,7 +190,10 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         1)
             if [ -n "$STORED_KEY" ]; then
                 print_info "Updating .env with stored encryption key..."
-                sed -i "s|^N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=$STORED_KEY|" .env
+                # Use sed_inplace for cross-platform compatibility
+                # Escape special characters in the key for sed
+                ESCAPED_KEY=$(printf '%s\n' "$STORED_KEY" | sed 's/[&/\]/\\&/g')
+                sed_inplace "s|^N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=${ESCAPED_KEY}|" .env
                 print_success ".env updated with stored key"
                 echo ""
                 print_info "Restarting n8n containers..."
@@ -186,7 +213,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
                 print_info "Stopping containers..."
                 docker compose down 2>/dev/null || docker-compose down
                 print_info "Removing n8n data volume..."
-                docker volume rm $VOLUME_NAME
+                docker volume rm "$VOLUME_NAME"
                 print_info "Starting containers with fresh data..."
                 docker compose up -d 2>/dev/null || docker-compose up -d
                 print_success "n8n reset complete! Access at http://localhost:5678"
