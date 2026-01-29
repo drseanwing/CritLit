@@ -31,7 +31,7 @@ TESTS_FAILED=0
 
 # Database connection parameters (from docker-compose.yml defaults)
 DB_HOST="${POSTGRES_HOST:-localhost}"
-DB_PORT="${POSTGRES_PORT:-5432}"
+DB_PORT="${POSTGRES_PORT:-7360}"
 DB_NAME="${POSTGRES_DB:-slr_database}"
 DB_USER="${POSTGRES_USER:-slr_user}"
 DB_PASSWORD="${POSTGRES_PASSWORD:-}"
