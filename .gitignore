@@ -261,3 +261,4 @@ prisma_diagrams/
 
 # N8N backup files
 backup_*.json
+.omc/

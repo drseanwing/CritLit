@@ -32,8 +32,13 @@ max_attempts=20
 attempt=1
 
 while [ $attempt -le $max_attempts ]; do
+<<<<<<< HEAD
     if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} Ollama API is responding at http://localhost:11434"
+=======
+    if curl -s http://localhost:7362/api/tags > /dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Ollama API is responding at http://localhost:7362"
+>>>>>>> main
         break
     fi
     
@@ -51,7 +56,11 @@ done
 # Check for installed models
 echo ""
 echo "Checking installed models..."
+<<<<<<< HEAD
 models=$(curl -s http://localhost:11434/api/tags 2>&1)
+=======
+models=$(curl -s http://localhost:7362/api/tags 2>&1)
+>>>>>>> main
 
 if echo "$models" | grep -q "models"; then
     echo -e "${GREEN}✓${NC} Ollama API can list models"

@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 # REdI | CritLit - Autonomous Systematic Literature Review Pipeline
 
 **Resuscitation EDucation Initiative** | Workforce Development & Education Unit
+=======
+# CritLit - Autonomous Systematic Literature Review Pipeline
+>>>>>>> main
 
 A doctoral-level SLR automation system integrating PRISMA 2020 compliance, multi-agent orchestration, and retrieval-augmented generation for **40-70% time savings** while maintaining methodological rigor.
 
@@ -266,10 +270,17 @@ This is an alpha-stage research project. Contributions are welcome once core fun
 
 Built following the "Ralph Playbook" pattern for multi-agent orchestration with PostgreSQL-backed persistent memory.
 
+<<<<<<< HEAD
 A project of the **Resuscitation EDucation Initiative (REdI)** | Metro North Health
 
 ---
 
 **Version**: Alpha 0.2
 **Last Updated**: 2026-01-29
+=======
+---
+
+**Version**: Alpha 0.2  
+**Last Updated**: 2026-01-24  
+>>>>>>> main
 **Status**: Phase 1 & 2 Complete, Phase 3 In Progress
