@@ -16,18 +16,20 @@ set -o pipefail
 
 # Colors for output
 if [[ -t 1 ]]; then
-  RED='\033[0;31m'
-  GREEN='\033[0;32m'
-  YELLOW='\033[1;33m'
-  BLUE='\033[0;34m'
-  CYAN='\033[0;36m'
+  RED='\033[38;2;220;53;69m'
+  GREEN='\033[38;2;40;167;69m'
+  YELLOW='\033[38;2;255;193;7m'
+  NAVY='\033[38;2;27;58;95m'
+  TEAL='\033[38;2;43;158;158m'
+  CORAL='\033[38;2;229;91;100m'
   NC='\033[0m'
 else
   RED=''
   GREEN=''
   YELLOW=''
-  BLUE=''
-  CYAN=''
+  CORAL=''
+  NAVY=''
+  TEAL=''
   NC=''
 fi
 
@@ -63,7 +65,7 @@ print_test() {
   local test_num=$1
   local test_name=$2
   echo ""
-  echo -e "${CYAN}[TEST $test_num]${NC} $test_name"
+  echo -e "${TEAL}[TEST $test_num]${NC} $test_name"
   echo "$(printf '%.0s-' {1..70})"
 }
 
@@ -631,7 +633,7 @@ test_generate_report() {
   local report_file="$TEST_DATA_DIR/test-report-$(date +%Y%m%d-%H%M%S).txt"
 
   {
-    echo "CritLit Integration Test Report"
+    echo "REdI | CritLit Integration Test Report"
     echo "Generated: $(date)"
     echo "========================================"
     echo ""
@@ -687,21 +689,21 @@ cleanup_test_data() {
 
 print_banner() {
   echo ""
-  echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${BLUE}║${NC}  ${CYAN}CritLit Integration Test Suite${NC}                            ${BLUE}║${NC}"
-  echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+  echo -e "${NAVY}╔════════════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${NAVY}║${NC}  ${TEAL}REdI | CritLit Integration Test Suite${NC}                     ${NAVY}║${NC}"
+  echo -e "${NAVY}╚════════════════════════════════════════════════════════════════╝${NC}"
   echo ""
 }
 
 print_summary() {
   echo ""
-  echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${BLUE}║${NC}  ${CYAN}Test Summary${NC}                                                ${BLUE}║${NC}"
-  echo -e "${BLUE}╠════════════════════════════════════════════════════════════════╣${NC}"
-  echo -e "${BLUE}║${NC}  ${GREEN}Passed:${NC}  $(printf '%3d' $PASSED)                                                ${BLUE}║${NC}"
-  echo -e "${BLUE}║${NC}  ${RED}Failed:${NC}  $(printf '%3d' $FAILED)                                                ${BLUE}║${NC}"
-  echo -e "${BLUE}║${NC}  ${YELLOW}Skipped:${NC} $(printf '%3d' $SKIPPED)                                                ${BLUE}║${NC}"
-  echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+  echo -e "${NAVY}╔════════════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${NAVY}║${NC}  ${TEAL}Test Summary${NC}                                                ${NAVY}║${NC}"
+  echo -e "${NAVY}╠════════════════════════════════════════════════════════════════╣${NC}"
+  echo -e "${NAVY}║${NC}  ${GREEN}Passed:${NC}  $(printf '%3d' $PASSED)                                                ${NAVY}║${NC}"
+  echo -e "${NAVY}║${NC}  ${RED}Failed:${NC}  $(printf '%3d' $FAILED)                                                ${NAVY}║${NC}"
+  echo -e "${NAVY}║${NC}  ${YELLOW}Skipped:${NC} $(printf '%3d' $SKIPPED)                                                ${NAVY}║${NC}"
+  echo -e "${NAVY}╚════════════════════════════════════════════════════════════════╝${NC}"
   echo ""
 
   if [[ $FAILED -eq 0 ]]; then

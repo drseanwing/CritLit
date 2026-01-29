@@ -1,13 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "=== Ollama Verification Script ==="
+echo "=== REdI | Ollama Verification ==="
 echo ""
 
-# Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
+# REdI brand colors for output
+CORAL='\033[38;2;229;91;100m'
+NAVY='\033[38;2;27;58;95m'
+TEAL='\033[38;2;43;158;158m'
+RED='\033[38;2;220;53;69m'
+GREEN='\033[38;2;40;167;69m'
+YELLOW='\033[38;2;255;193;7m'
 NC='\033[0m' # No Color
 
 # Check if Ollama API is responding
