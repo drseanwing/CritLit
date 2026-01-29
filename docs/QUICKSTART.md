@@ -1,4 +1,4 @@
-# CritLit Quickstart Guide
+# REdI | CritLit Quickstart Guide
 
 Get your automated systematic literature review (SLR) pipeline running in under 10 minutes.
 
@@ -159,13 +159,13 @@ docker exec -it slr_postgres psql -U slr_user -d slr_database -c "SELECT version
 **n8n:**
 ```bash
 # Open in browser - should show login page
-http://localhost:5678
+http://localhost:7361
 ```
 
 **Ollama:**
 ```bash
 # Test API endpoint
-curl http://localhost:11434/api/tags
+curl http://localhost:7362/api/tags
 ```
 
 ---
@@ -174,7 +174,7 @@ curl http://localhost:11434/api/tags
 
 ### Login to n8n
 
-1. Open your browser to **http://localhost:5678**
+1. Open your browser to **http://localhost:7361**
 2. Login with credentials from your `.env` file:
    - Username: Value of `N8N_USER`
    - Password: Value of `N8N_PASSWORD`
@@ -365,7 +365,7 @@ LIMIT 10;
 1. Open **slr_human_review** workflow
 2. Configure for your Review ID
 3. Execute to launch a simple web-based review interface (via webhook)
-4. Access at: `http://localhost:5678/webhook/review/{review_id}`
+4. Access at: `http://localhost:7361/webhook/review/{review_id}`
 
 ---
 
@@ -399,7 +399,7 @@ After completing screening:
 
 ### Advanced Features
 
-- **Full-Text PDF Management**: Use i-Librarian at http://localhost:8080
+- **Full-Text PDF Management**: Use i-Librarian at http://localhost:7363
 - **Quality Assessment**: Configure GRADE/CASP/JBI checklists
 - **Data Extraction**: Customize extraction templates
 - **Meta-Analysis Integration**: Export data for RevMan/R
@@ -434,7 +434,7 @@ docker compose restart
 
 ### Can't Connect to n8n
 
-**Problem:** http://localhost:5678 shows "Connection refused"
+**Problem:** http://localhost:7361 shows "Connection refused"
 
 **Solution:**
 ```bash
@@ -453,7 +453,7 @@ docker compose restart n8n
 
 **Problem:** n8n container keeps restarting with error:
 ```
-Error: Mismatching encryption keys. The encryption key in the settings file 
+Error: Mismatching encryption keys. The encryption key in the settings file
 /home/node/.n8n/config does not match the N8N_ENCRYPTION_KEY env var.
 ```
 
@@ -538,7 +538,7 @@ docker compose exec ollama ollama pull llama3.2:70b
 docker compose exec ollama ollama list
 
 # Test generation
-curl http://localhost:11434/api/generate -d '{
+curl http://localhost:7362/api/generate -d '{
   "model": "llama3.2",
   "prompt": "Hello!",
   "stream": false
@@ -645,7 +645,7 @@ docker compose exec ollama nvidia-smi
 
 ## What's Next?
 
-Now that your CritLit pipeline is running:
+Now that your REdI | CritLit pipeline is running:
 
 1. **Customize Workflows**: Edit workflows to match your review protocol
 2. **Configure AI Prompts**: Fine-tune screening and extraction prompts
@@ -657,6 +657,6 @@ Now that your CritLit pipeline is running:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-01-25
-**Maintained By**: CritLit Project Team
+**Document Version**: 1.1
+**Last Updated**: 2026-01-29
+**Maintained By**: REdI | CritLit Project Team

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================================
-# Database Verification Script for CritLit SLR Pipeline
+# REdI | CritLit - Database Verification Script
 # ============================================================================
 # This script verifies that the PostgreSQL database is properly initialized
 # with all required tables, extensions, indexes, and configurations.
@@ -16,10 +16,12 @@
 set -e
 
 # ANSI color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+RED='\033[38;2;220;53;69m'
+GREEN='\033[38;2;40;167;69m'
+YELLOW='\033[38;2;255;193;7m'
+NAVY='\033[38;2;27;58;95m'
+CORAL='\033[38;2;229;91;100m'
+TEAL='\033[38;2;43;158;158m'
 NC='\033[0m' # No Color
 
 # Test counters
@@ -36,9 +38,9 @@ DB_PASSWORD="${POSTGRES_PASSWORD:-}"
 
 # Helper functions
 print_header() {
-    echo -e "\n${BLUE}================================================${NC}"
-    echo -e "${BLUE}$1${NC}"
-    echo -e "${BLUE}================================================${NC}\n"
+    echo -e "\n${NAVY}================================================${NC}"
+    echo -e "${NAVY}$1${NC}"
+    echo -e "${NAVY}================================================${NC}\n"
 }
 
 print_test() {
@@ -57,7 +59,7 @@ print_fail() {
 }
 
 print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "${NAVY}[INFO]${NC} $1"
 }
 
 # SQL execution helper
@@ -320,7 +322,7 @@ test_triggers() {
 # Main Execution
 # ============================================================================
 main() {
-    print_header "CritLit Database Verification Suite"
+    print_header "REdI | CritLit Database Verification Suite"
     print_info "Database: $DB_HOST:$DB_PORT/$DB_NAME"
     print_info "User: $DB_USER"
 
@@ -337,7 +339,7 @@ main() {
 
     # Print summary
     print_header "Test Summary"
-    echo -e "Total Tests:  ${BLUE}$TESTS_RUN${NC}"
+    echo -e "Total Tests:  ${NAVY}$TESTS_RUN${NC}"
     echo -e "Passed:       ${GREEN}$TESTS_PASSED${NC}"
     echo -e "Failed:       ${RED}$TESTS_FAILED${NC}"
 

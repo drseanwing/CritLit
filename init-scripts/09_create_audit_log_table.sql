@@ -23,10 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_type, actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
 CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(timestamp DESC);
 
--- Create partial index for recent audit entries (last 30 days) for faster queries
-CREATE INDEX IF NOT EXISTS idx_audit_recent 
-    ON audit_log(review_id, timestamp DESC)
-    WHERE timestamp > NOW() - INTERVAL '30 days';
+-- Note: Partial index for recent entries removed because NOW() is not IMMUTABLE
+-- The idx_audit_time index above handles time-based queries efficiently
 
 -- Add comments for documentation
 COMMENT ON TABLE audit_log IS 'Comprehensive audit trail for all decisions and state changes in the review';

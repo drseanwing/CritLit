@@ -1,14 +1,27 @@
 #!/bin/bash
+# REdI | CritLit - Ollama Verification Script
 set -e
 
-echo "=== Ollama Verification Script ==="
+echo "=== REdI | Ollama Verification ==="
 echo ""
 
-# Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
+# REdI brand colors for output
+CORAL='\033[38;2;229;91;100m'
+NAVY='\033[38;2;27;58;95m'
+TEAL='\033[38;2;43;158;158m'
+RED='\033[38;2;220;53;69m'
+GREEN='\033[38;2;40;167;69m'
+YELLOW='\033[38;2;255;193;7m'
 NC='\033[0m' # No Color
+
+# Pre-check: Ensure Ollama container is running
+if ! docker ps | grep -q slr_ollama; then
+    echo -e "${RED}✗${NC} Ollama container is not running"
+    echo "Start services with: ./start.sh"
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} Ollama container is running"
+echo ""
 
 # Check if Ollama API is responding
 echo "1. Checking Ollama API connection..."

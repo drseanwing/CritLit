@@ -2,7 +2,7 @@
 set -e
 
 # ==============================================================================
-# CritLit Systematic Literature Review Stack - Startup Script
+# REdI | CritLit Systematic Literature Review Stack - Startup Script
 # ==============================================================================
 # This script orchestrates the startup of all Docker services with proper
 # health checks and dependency ordering.
@@ -10,25 +10,27 @@ set -e
 
 # Colors for output (cross-platform friendly)
 if [[ -t 1 ]]; then
-  RED='\033[0;31m'
-  GREEN='\033[0;32m'
-  YELLOW='\033[1;33m'
-  BLUE='\033[0;34m'
-  CYAN='\033[0;36m'
-  NC='\033[0m' # No Color
+  CORAL='\033[38;2;229;91;100m'
+  NAVY='\033[38;2;27;58;95m'
+  TEAL='\033[38;2;43;158;158m'
+  RED='\033[38;2;220;53;69m'
+  GREEN='\033[38;2;40;167;69m'
+  YELLOW='\033[38;2;255;193;7m'
+  NC='\033[0m'
 else
+  CORAL=''
+  NAVY=''
+  TEAL=''
   RED=''
   GREEN=''
   YELLOW=''
-  BLUE=''
-  CYAN=''
   NC=''
 fi
 
 # Print banner
-echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}  ${CYAN}CritLit - Systematic Literature Review Stack${NC}              ${BLUE}║${NC}"
-echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${NAVY}╔════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${NAVY}║${NC}  ${CORAL}R${NC}${NAVY}Ed${NC}${CORAL}I${NC} | CritLit - Systematic Literature Review Stack      ${NAVY}║${NC}"
+echo -e "${NAVY}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Get script directory for relative paths
@@ -41,7 +43,7 @@ cd "$PROJECT_ROOT"
 # ------------------------------------------------------------------------------
 # Step 1: Environment File Check
 # ------------------------------------------------------------------------------
-echo -e "${CYAN}[1/9]${NC} Checking environment configuration..."
+echo -e "${TEAL}[1/9]${NC} Checking environment configuration..."
 
 if [ ! -f ".env" ]; then
   if [ -f ".env.example" ]; then
@@ -70,7 +72,7 @@ fi
 # Step 2: Docker Compose Up
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[2/9]${NC} Starting Docker services..."
+echo -e "${TEAL}[2/9]${NC} Starting Docker services..."
 
 if ! command -v docker &> /dev/null; then
   echo -e "${RED}✗ ERROR:${NC} Docker is not installed or not in PATH"
@@ -97,7 +99,7 @@ echo -e "${GREEN}✓${NC} Docker services started"
 # Step 3: PostgreSQL Health Check
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[3/9]${NC} Waiting for PostgreSQL..."
+echo -e "${TEAL}[3/9]${NC} Waiting for PostgreSQL..."
 
 MAX_WAIT=60
 ELAPSED=0
@@ -127,7 +129,7 @@ fi
 # Step 4: Redis Health Check
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[4/9]${NC} Waiting for Redis..."
+echo -e "${TEAL}[4/9]${NC} Waiting for Redis..."
 
 MAX_WAIT=30
 ELAPSED=0
@@ -154,7 +156,7 @@ fi
 # Step 5: n8n Health Check
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[5/9]${NC} Waiting for n8n..."
+echo -e "${TEAL}[5/9]${NC} Waiting for n8n..."
 
 MAX_WAIT=60
 ELAPSED=0
@@ -185,7 +187,7 @@ fi
 # Step 6: Ollama Health Check
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[6/9]${NC} Waiting for Ollama..."
+echo -e "${TEAL}[6/9]${NC} Waiting for Ollama..."
 
 MAX_WAIT=60
 ELAPSED=0
@@ -213,7 +215,7 @@ fi
 # Step 7: i-Librarian Health Check
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[7/9]${NC} Waiting for i-Librarian..."
+echo -e "${TEAL}[7/9]${NC} Waiting for i-Librarian..."
 
 MAX_WAIT=30
 ELAPSED=0
@@ -241,7 +243,7 @@ fi
 # Step 8: Check n8n Worker
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[8/9]${NC} Checking n8n worker..."
+echo -e "${TEAL}[8/9]${NC} Checking n8n worker..."
 
 if $DOCKER_COMPOSE ps n8n-worker --format json 2>/dev/null | grep -q '"State":"running"'; then
   echo -e "${GREEN}✓${NC} n8n worker is running"
@@ -254,19 +256,19 @@ fi
 # Step 9: Success Summary
 # ------------------------------------------------------------------------------
 echo ""
-echo -e "${CYAN}[9/9]${NC} Startup complete!"
+echo -e "${TEAL}[9/9]${NC} Startup complete!"
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║${NC}  ${BLUE}Services Running${NC}                                             ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${NAVY}Services Running${NC}                                             ${GREEN}║${NC}"
 echo -e "${GREEN}╠════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}PostgreSQL (pgvector)${NC}     http://localhost:7360              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}n8n Workflow Automation${NC}   http://localhost:7361              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}i-Librarian${NC}               http://localhost:7363              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}Ollama (LLM)${NC}              http://localhost:7362              ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  ${CYAN}Redis${NC}                     (internal only)                    ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${TEAL}PostgreSQL (pgvector)${NC}     http://localhost:7360              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${TEAL}n8n Workflow Automation${NC}   http://localhost:7361              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${TEAL}i-Librarian${NC}               http://localhost:7363              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${TEAL}Ollama (LLM)${NC}              http://localhost:7362              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${TEAL}Redis${NC}                     (internal only)                    ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${BLUE}Tips:${NC}"
+echo -e "${NAVY}Tips:${NC}"
 echo -e "  • View all logs:        ${YELLOW}$DOCKER_COMPOSE logs -f${NC}"
 echo -e "  • View specific service: ${YELLOW}$DOCKER_COMPOSE logs -f <service>${NC}"
 echo -e "  • Stop all services:    ${YELLOW}$DOCKER_COMPOSE down${NC}"
