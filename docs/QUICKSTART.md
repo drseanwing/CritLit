@@ -1,4 +1,4 @@
-# CritLit Quickstart Guide
+# REdI | CritLit Quickstart Guide
 
 Get your automated systematic literature review (SLR) pipeline running in under 10 minutes.
 
@@ -449,13 +449,11 @@ docker compose logs n8n
 docker compose restart n8n
 ```
 
-<<<<<<< HEAD
-=======
 ### n8n Encryption Key Mismatch
 
 **Problem:** n8n container keeps restarting with error:
 ```
-Error: Mismatching encryption keys. The encryption key in the settings file 
+Error: Mismatching encryption keys. The encryption key in the settings file
 /home/node/.n8n/config does not match the N8N_ENCRYPTION_KEY env var.
 ```
 
@@ -503,7 +501,6 @@ bash scripts/fix-n8n-encryption.sh
 - **Back up** your encryption key securely (e.g., password manager)
 - If using version control for `.env` files, store the encryption key separately
 
->>>>>>> main
 ### PostgreSQL Connection Failed
 
 **Problem:** n8n workflows can't connect to database
@@ -648,7 +645,7 @@ docker compose exec ollama nvidia-smi
 
 ## What's Next?
 
-Now that your CritLit pipeline is running:
+Now that your REdI | CritLit pipeline is running:
 
 1. **Customize Workflows**: Edit workflows to match your review protocol
 2. **Configure AI Prompts**: Fine-tune screening and extraction prompts
@@ -660,6 +657,6 @@ Now that your CritLit pipeline is running:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-01-25
-**Maintained By**: CritLit Project Team
+**Document Version**: 1.1
+**Last Updated**: 2026-01-29
+**Maintained By**: REdI | CritLit Project Team

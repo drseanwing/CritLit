@@ -1,8 +1,8 @@
 #!/bin/bash
+# REdI | CritLit - Vector Extension Verification Script
 set -e
 
 echo "========================================="
-<<<<<<< HEAD
 echo "REdI | Vector Extension Verification"
 echo "========================================="
 echo ""
@@ -14,16 +14,6 @@ TEAL='\033[38;2;43;158;158m'
 RED='\033[38;2;220;53;69m'
 GREEN='\033[38;2;40;167;69m'
 YELLOW='\033[38;2;255;193;7m'
-=======
-echo "Vector Extension Verification Script"
-echo "========================================="
-echo ""
-
-# Color codes for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
->>>>>>> main
 NC='\033[0m' # No Color
 
 # Test counter
@@ -32,7 +22,7 @@ TESTS_FAILED=0
 
 # Helper function to run SQL and capture output
 run_sql() {
-    docker compose exec -T db psql -U slr_user -d slr_database -t -c "$1" 2>&1
+    docker compose exec -T postgres psql -U slr_user -d slr_database -t -c "$1" 2>&1
 }
 
 # Helper function to print test result
@@ -48,6 +38,15 @@ print_result() {
         ((TESTS_FAILED++))
     fi
 }
+
+# Pre-check: Ensure PostgreSQL container is running
+if ! docker ps | grep -q slr_postgres; then
+    echo -e "${RED}✗${NC} PostgreSQL container is not running"
+    echo "Start services with: ./start.sh"
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} PostgreSQL container is running"
+echo ""
 
 echo "Test 1: Checking vector extension installation..."
 RESULT=$(run_sql "SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector';")
@@ -156,6 +155,28 @@ if [[ ! "$RESULT" =~ "ERROR" ]]; then
     print_result "Cleanup test table" "PASS"
 else
     print_result "Cleanup test table" "FAIL"
+    echo "  Error: $RESULT"
+fi
+echo ""
+
+echo "Test 12: Testing trigram similarity..."
+RESULT=$(run_sql "SELECT similarity('systematic review', 'systematic literature review');")
+if [[ ! "$RESULT" =~ "ERROR" ]] && [[ -n "$RESULT" ]]; then
+    SIMILARITY=$(echo "$RESULT" | tr -d '[:space:]')
+    print_result "Trigram similarity function working (similarity: $SIMILARITY)" "PASS"
+else
+    print_result "Trigram similarity function" "FAIL"
+    echo "  Error: $RESULT"
+fi
+echo ""
+
+echo "Test 13: Testing UUID generation..."
+RESULT=$(run_sql "SELECT uuid_generate_v4();")
+if [[ ! "$RESULT" =~ "ERROR" ]] && [[ -n "$RESULT" ]]; then
+    UUID=$(echo "$RESULT" | tr -d '[:space:]')
+    print_result "UUID generation working (sample: $UUID)" "PASS"
+else
+    print_result "UUID generation" "FAIL"
     echo "  Error: $RESULT"
 fi
 echo ""

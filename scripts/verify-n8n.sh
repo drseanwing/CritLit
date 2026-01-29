@@ -1,19 +1,15 @@
 #!/bin/bash
+# REdI | CritLit - n8n Service Verification Script
 set -e
 
 echo "========================================"
-<<<<<<< HEAD
 echo "REdI | n8n Service Verification"
-=======
-echo "n8n Service Verification Script"
->>>>>>> main
 echo "========================================"
 echo ""
 
 SUCCESS=0
 FAILED=0
 
-<<<<<<< HEAD
 # REdI brand colors for output
 CORAL='\033[38;2;229;91;100m'
 NAVY='\033[38;2;27;58;95m'
@@ -21,12 +17,6 @@ TEAL='\033[38;2;43;158;158m'
 RED='\033[38;2;220;53;69m'
 GREEN='\033[38;2;40;167;69m'
 YELLOW='\033[38;2;255;193;7m'
-=======
-# Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
->>>>>>> main
 NC='\033[0m' # No Color
 
 # Function to print success
@@ -43,26 +33,24 @@ print_failure() {
 
 # Function to print info
 print_info() {
-<<<<<<< HEAD
     echo -e "${TEAL}ℹ${NC} $1"
-=======
-    echo -e "${YELLOW}ℹ${NC} $1"
->>>>>>> main
 }
+
+# Pre-check: Ensure n8n container is running
+if ! docker ps | grep -q slr_n8n; then
+    echo -e "${RED}✗${NC} n8n container is not running"
+    echo "Start services with: ./start.sh"
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} n8n container is running"
+echo ""
 
 # 1. Check n8n web interface
 echo "1. Checking n8n web interface..."
-<<<<<<< HEAD
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:5678 | grep -q "200\|401"; then
-    print_success "n8n web interface is accessible at http://localhost:5678"
-else
-    print_failure "n8n web interface is not accessible at http://localhost:5678"
-=======
 if curl -s -o /dev/null -w "%{http_code}" http://localhost:7361 | grep -q "200\|401"; then
     print_success "n8n web interface is accessible at http://localhost:7361"
 else
     print_failure "n8n web interface is not accessible at http://localhost:7361"
->>>>>>> main
 fi
 echo ""
 
@@ -126,13 +114,8 @@ if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}All checks passed!${NC}"
     echo ""
     echo "Service URLs:"
-<<<<<<< HEAD
-    echo "  - n8n UI: http://localhost:5678"
-    echo "  - PostgreSQL: localhost:5432"
-=======
     echo "  - n8n UI: http://localhost:7361"
     echo "  - PostgreSQL: localhost:7360"
->>>>>>> main
     echo "  - Redis: localhost:6379 (internal)"
     exit 0
 else

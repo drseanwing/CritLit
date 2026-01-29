@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================================
-# Database Verification Script for CritLit SLR Pipeline
+# REdI | CritLit - Database Verification Script
 # ============================================================================
 # This script verifies that the PostgreSQL database is properly initialized
 # with all required tables, extensions, indexes, and configurations.
@@ -16,19 +16,12 @@
 set -e
 
 # ANSI color codes for output
-<<<<<<< HEAD
 RED='\033[38;2;220;53;69m'
 GREEN='\033[38;2;40;167;69m'
 YELLOW='\033[38;2;255;193;7m'
 NAVY='\033[38;2;27;58;95m'
 CORAL='\033[38;2;229;91;100m'
 TEAL='\033[38;2;43;158;158m'
-=======
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
->>>>>>> main
 NC='\033[0m' # No Color
 
 # Test counters
@@ -38,26 +31,16 @@ TESTS_FAILED=0
 
 # Database connection parameters (from docker-compose.yml defaults)
 DB_HOST="${POSTGRES_HOST:-localhost}"
-<<<<<<< HEAD
 DB_PORT="${POSTGRES_PORT:-5432}"
-=======
-DB_PORT="${POSTGRES_PORT:-7360}"
->>>>>>> main
 DB_NAME="${POSTGRES_DB:-slr_database}"
 DB_USER="${POSTGRES_USER:-slr_user}"
 DB_PASSWORD="${POSTGRES_PASSWORD:-}"
 
 # Helper functions
 print_header() {
-<<<<<<< HEAD
     echo -e "\n${NAVY}================================================${NC}"
     echo -e "${NAVY}$1${NC}"
     echo -e "${NAVY}================================================${NC}\n"
-=======
-    echo -e "\n${BLUE}================================================${NC}"
-    echo -e "${BLUE}$1${NC}"
-    echo -e "${BLUE}================================================${NC}\n"
->>>>>>> main
 }
 
 print_test() {
@@ -76,11 +59,7 @@ print_fail() {
 }
 
 print_info() {
-<<<<<<< HEAD
     echo -e "${NAVY}[INFO]${NC} $1"
-=======
-    echo -e "${BLUE}[INFO]${NC} $1"
->>>>>>> main
 }
 
 # SQL execution helper
@@ -343,11 +322,7 @@ test_triggers() {
 # Main Execution
 # ============================================================================
 main() {
-<<<<<<< HEAD
     print_header "REdI | CritLit Database Verification Suite"
-=======
-    print_header "CritLit Database Verification Suite"
->>>>>>> main
     print_info "Database: $DB_HOST:$DB_PORT/$DB_NAME"
     print_info "User: $DB_USER"
 
@@ -364,11 +339,7 @@ main() {
 
     # Print summary
     print_header "Test Summary"
-<<<<<<< HEAD
     echo -e "Total Tests:  ${NAVY}$TESTS_RUN${NC}"
-=======
-    echo -e "Total Tests:  ${BLUE}$TESTS_RUN${NC}"
->>>>>>> main
     echo -e "Passed:       ${GREEN}$TESTS_PASSED${NC}"
     echo -e "Failed:       ${RED}$TESTS_FAILED${NC}"
 

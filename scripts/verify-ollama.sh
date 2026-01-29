@@ -1,7 +1,7 @@
 #!/bin/bash
+# REdI | CritLit - Ollama Verification Script
 set -e
 
-<<<<<<< HEAD
 echo "=== REdI | Ollama Verification ==="
 echo ""
 
@@ -12,30 +12,23 @@ TEAL='\033[38;2;43;158;158m'
 RED='\033[38;2;220;53;69m'
 GREEN='\033[38;2;40;167;69m'
 YELLOW='\033[38;2;255;193;7m'
-=======
-echo "=== Ollama Verification Script ==="
-echo ""
-
-# Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
->>>>>>> main
 NC='\033[0m' # No Color
+
+# Pre-check: Ensure Ollama container is running
+if ! docker ps | grep -q slr_ollama; then
+    echo -e "${RED}✗${NC} Ollama container is not running"
+    echo "Start services with: ./start.sh"
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} Ollama container is running"
+echo ""
 
 # Check if Ollama API is responding
 echo "1. Checking Ollama API connection..."
-<<<<<<< HEAD
-if curl -s --max-time 5 http://localhost:11434/api/tags > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ Ollama API is responding${NC}"
-else
-    echo -e "${RED}✗ Ollama API is not responding at http://localhost:11434${NC}"
-=======
 if curl -s --max-time 5 http://localhost:7362/api/tags > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Ollama API is responding${NC}"
 else
     echo -e "${RED}✗ Ollama API is not responding at http://localhost:7362${NC}"
->>>>>>> main
     echo ""
     echo "Next steps:"
     echo "  1. Check if Docker containers are running: docker compose ps"
@@ -46,11 +39,7 @@ fi
 
 echo ""
 echo "2. Checking installed models..."
-<<<<<<< HEAD
-MODELS=$(curl -s http://localhost:11434/api/tags | jq -r '.models[] | .name' 2>/dev/null || echo "")
-=======
 MODELS=$(curl -s http://localhost:7362/api/tags | jq -r '.models[] | .name' 2>/dev/null || echo "")
->>>>>>> main
 
 if [ -z "$MODELS" ]; then
     echo -e "${YELLOW}⚠ No models installed${NC}"
@@ -76,11 +65,7 @@ if echo "$MODELS" | grep -q "llama3.1"; then
     MODEL=$(echo "$MODELS" | grep "llama3.1" | head -n 1)
     echo "Using model: $MODEL"
 
-<<<<<<< HEAD
-    RESPONSE=$(curl -s http://localhost:11434/api/generate -d '{
-=======
     RESPONSE=$(curl -s http://localhost:7362/api/generate -d '{
->>>>>>> main
         "model": "'"$MODEL"'",
         "prompt": "Say hello in one sentence.",
         "stream": false
@@ -122,13 +107,7 @@ echo ""
 echo "=== Verification Complete ==="
 echo ""
 echo -e "${GREEN}Next steps:${NC}"
-<<<<<<< HEAD
-echo "  1. Test the embedding endpoint: curl http://localhost:11434/api/embeddings -d '{\"model\": \"$MODEL\", \"prompt\": \"test\"}'"
-echo "  2. Check application logs: docker compose logs app"
-echo "  3. Access the application at http://localhost:3000"
-=======
 echo "  1. Test the embedding endpoint: curl http://localhost:7362/api/embeddings -d '{\"model\": \"$MODEL\", \"prompt\": \"test\"}'"
 echo "  2. Check Ollama logs: docker compose logs ollama"
 echo "  3. Access n8n at http://localhost:7361"
->>>>>>> main
 echo ""
