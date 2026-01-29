@@ -16,20 +16,33 @@ set -o pipefail
 
 # Colors for output
 if [[ -t 1 ]]; then
+<<<<<<< HEAD
   RED='\033[38;2;220;53;69m'
   GREEN='\033[38;2;40;167;69m'
   YELLOW='\033[38;2;255;193;7m'
   NAVY='\033[38;2;27;58;95m'
   TEAL='\033[38;2;43;158;158m'
   CORAL='\033[38;2;229;91;100m'
+=======
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  BLUE='\033[0;34m'
+  CYAN='\033[0;36m'
+>>>>>>> main
   NC='\033[0m'
 else
   RED=''
   GREEN=''
   YELLOW=''
+<<<<<<< HEAD
   CORAL=''
   NAVY=''
   TEAL=''
+=======
+  BLUE=''
+  CYAN=''
+>>>>>>> main
   NC=''
 fi
 
@@ -65,7 +78,11 @@ print_test() {
   local test_num=$1
   local test_name=$2
   echo ""
+<<<<<<< HEAD
   echo -e "${TEAL}[TEST $test_num]${NC} $test_name"
+=======
+  echo -e "${CYAN}[TEST $test_num]${NC} $test_name"
+>>>>>>> main
   echo "$(printf '%.0s-' {1..70})"
 }
 
@@ -160,7 +177,11 @@ test_services_healthy() {
 
   # Check n8n
   echo -n "  Checking n8n... "
+<<<<<<< HEAD
   if check_service "n8n" "http://localhost:5678" "401"; then
+=======
+  if check_service "n8n" "http://localhost:7361" "401"; then
+>>>>>>> main
     echo -e "${GREEN}✓${NC}"
   else
     echo -e "${RED}✗${NC}"
@@ -169,7 +190,11 @@ test_services_healthy() {
 
   # Check Ollama (optional)
   echo -n "  Checking Ollama... "
+<<<<<<< HEAD
   if check_service "ollama" "http://localhost:11434/api/tags" "200"; then
+=======
+  if check_service "ollama" "http://localhost:7362/api/tags" "200"; then
+>>>>>>> main
     echo -e "${GREEN}✓${NC}"
   else
     echo -e "${YELLOW}⊘ (optional)${NC}"
@@ -177,7 +202,11 @@ test_services_healthy() {
 
   # Check i-Librarian (optional)
   echo -n "  Checking i-Librarian... "
+<<<<<<< HEAD
   if check_service "i-librarian" "http://localhost:8080" "200" || check_service "i-librarian" "http://localhost:8080" "302"; then
+=======
+  if check_service "i-librarian" "http://localhost:7363" "200" || check_service "i-librarian" "http://localhost:7363" "302"; then
+>>>>>>> main
     echo -e "${GREEN}✓${NC}"
   else
     echo -e "${YELLOW}⊘ (optional)${NC}"
@@ -633,7 +662,11 @@ test_generate_report() {
   local report_file="$TEST_DATA_DIR/test-report-$(date +%Y%m%d-%H%M%S).txt"
 
   {
+<<<<<<< HEAD
     echo "REdI | CritLit Integration Test Report"
+=======
+    echo "CritLit Integration Test Report"
+>>>>>>> main
     echo "Generated: $(date)"
     echo "========================================"
     echo ""
@@ -689,14 +722,21 @@ cleanup_test_data() {
 
 print_banner() {
   echo ""
+<<<<<<< HEAD
   echo -e "${NAVY}╔════════════════════════════════════════════════════════════════╗${NC}"
   echo -e "${NAVY}║${NC}  ${TEAL}REdI | CritLit Integration Test Suite${NC}                     ${NAVY}║${NC}"
   echo -e "${NAVY}╚════════════════════════════════════════════════════════════════╝${NC}"
+=======
+  echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║${NC}  ${CYAN}CritLit Integration Test Suite${NC}                            ${BLUE}║${NC}"
+  echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+>>>>>>> main
   echo ""
 }
 
 print_summary() {
   echo ""
+<<<<<<< HEAD
   echo -e "${NAVY}╔════════════════════════════════════════════════════════════════╗${NC}"
   echo -e "${NAVY}║${NC}  ${TEAL}Test Summary${NC}                                                ${NAVY}║${NC}"
   echo -e "${NAVY}╠════════════════════════════════════════════════════════════════╣${NC}"
@@ -704,6 +744,15 @@ print_summary() {
   echo -e "${NAVY}║${NC}  ${RED}Failed:${NC}  $(printf '%3d' $FAILED)                                                ${NAVY}║${NC}"
   echo -e "${NAVY}║${NC}  ${YELLOW}Skipped:${NC} $(printf '%3d' $SKIPPED)                                                ${NAVY}║${NC}"
   echo -e "${NAVY}╚════════════════════════════════════════════════════════════════╝${NC}"
+=======
+  echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║${NC}  ${CYAN}Test Summary${NC}                                                ${BLUE}║${NC}"
+  echo -e "${BLUE}╠════════════════════════════════════════════════════════════════╣${NC}"
+  echo -e "${BLUE}║${NC}  ${GREEN}Passed:${NC}  $(printf '%3d' $PASSED)                                                ${BLUE}║${NC}"
+  echo -e "${BLUE}║${NC}  ${RED}Failed:${NC}  $(printf '%3d' $FAILED)                                                ${BLUE}║${NC}"
+  echo -e "${BLUE}║${NC}  ${YELLOW}Skipped:${NC} $(printf '%3d' $SKIPPED)                                                ${BLUE}║${NC}"
+  echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+>>>>>>> main
   echo ""
 
   if [[ $FAILED -eq 0 ]]; then

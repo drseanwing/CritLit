@@ -32,8 +32,13 @@ max_attempts=30
 attempt=1
 
 while [ $attempt -le $max_attempts ]; do
+<<<<<<< HEAD
     if curl -s -o /dev/null -w "%{http_code}" http://localhost:5678 | grep -q "200\|401"; then
         echo -e "${GREEN}✓${NC} n8n web interface is accessible at http://localhost:5678"
+=======
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost:7361 | grep -q "200\|401"; then
+        echo -e "${GREEN}✓${NC} n8n web interface is accessible at http://localhost:7361"
+>>>>>>> main
         break
     fi
     
@@ -70,7 +75,11 @@ echo "========================================"
 echo "n8n Access Information"
 echo "========================================"
 echo ""
+<<<<<<< HEAD
 echo "  URL: http://localhost:5678"
+=======
+echo "  URL: http://localhost:7361"
+>>>>>>> main
 echo "  Username: (from .env N8N_USER)"
 echo "  Password: (from .env N8N_PASSWORD)"
 echo ""

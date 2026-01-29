@@ -12,7 +12,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     ports:
+<<<<<<< HEAD
       - "5432:5432"
+=======
+      - "7360:5432"
+>>>>>>> main
     command:
       - postgres
       - -c
@@ -49,7 +53,11 @@ services:
       - n8n_data:/home/node/.n8n
       - ./workflows:/workflows
     ports:
+<<<<<<< HEAD
       - "5678:5678"
+=======
+      - "7361:5678"
+>>>>>>> main
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,6 +82,27 @@ services:
       - n8n
       - redis
 
+<<<<<<< HEAD
+=======
+  # n8n-mcp: MCP (Model Context Protocol) server for n8n integration
+  # Enables Claude and other AI assistants to interact with n8n workflows via stdio protocol
+  # Connect via Docker exec or configure in Claude settings (no HTTP ports needed)
+  n8n-mcp:
+    image: ghcr.io/czlonkowski/n8n-mcp:latest
+    container_name: slr_n8n_mcp
+    environment:
+      - MCP_MODE=stdio
+      - LOG_LEVEL=error
+      - DISABLE_CONSOLE_OUTPUT=true
+      - N8N_API_URL=http://n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+      - WEBHOOK_SECURITY_MODE=moderate
+    depends_on:
+      - n8n
+    # Note: No ports exposed - MCP uses stdio protocol
+    # Connect via Docker exec or configure in Claude settings
+
+>>>>>>> main
   redis:
     image: redis:7-alpine
     container_name: slr_redis
@@ -86,6 +115,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
+<<<<<<< HEAD
       - "11434:11434"
     deploy:
       resources:
@@ -94,6 +124,17 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+=======
+      - "7362:11434"
+    # NVIDIA GPU support commented out for testing server compatibility
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+>>>>>>> main
 
   i-librarian:
     image: cgrima/i-librarian
@@ -101,7 +142,11 @@ services:
     volumes:
       - ilibrarian_data:/app/data
     ports:
+<<<<<<< HEAD
       - "8080:80"
+=======
+      - "7363:80"
+>>>>>>> main
     environment:
       - ILIBRARIAN_UPLOAD_MAX_SIZE=100M
 
